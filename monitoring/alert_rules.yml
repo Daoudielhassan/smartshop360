@@ -1,0 +1,45 @@
+groups:
+  - name: smartshop360_alerts
+    rules:
+
+      # ETL échoué
+      - alert: ETLFailed
+        expr: increase(smartshop_etl_runs_total{status="failure"}[1h]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ETL en échec"
+          description: "Au moins un run ETL a échoué au cours de la dernière heure."
+
+      # ETL trop lent (> 5 min)
+      - alert: ETLSlow
+        expr: smartshop_etl_duration_seconds_sum / smartshop_etl_duration_seconds_count > 300
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ETL lent"
+          description: "La durée moyenne de l'ETL dépasse 5 minutes."
+
+      # Qualité des données dégradée
+      - alert: DataQualityErrors
+        expr: increase(smartshop_dq_checks_total{result="fail_error"}[1h]) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Qualité données dégradée"
+          description: "Plus de 5 contrôles qualité ont échoué en 1 heure."
+
+      # Agent IA saturé d'erreurs
+      - alert: AgentHighErrorRate
+        expr: |
+          rate(smartshop_agent_requests_total{status="error"}[5m])
+          / rate(smartshop_agent_requests_total[5m]) > 0.2
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Taux d'erreur agent IA > 20 %"
+          description: "L'agent IA génère trop d'erreurs. Vérifiez la connexion LLM."

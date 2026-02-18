@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  # ──────────────────────────────────────────────
+  # Base de données PostgreSQL
+  # ──────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: smartshop360_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-smartshop_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-smartshop_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ──────────────────────────────────────────────
+  # Application Streamlit
+  # ──────────────────────────────────────────────
+  app:
+    build: .
+    container_name: smartshop360_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db          # override pour pointer vers le service Docker
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./Data:/app/Data:ro      # CSV monté en lecture seule
+    command: >
+      sh -c "python -m src.etl.run_etl && streamlit run app.py
+             --server.port=8501 --server.address=0.0.0.0"
+
+volumes:
+  pgdata:

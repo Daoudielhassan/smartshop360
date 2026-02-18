@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  # ─────────────────────────────────────────────────────────────
+  #  Prometheus
+  # ─────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: smartshop_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────────────────────
+  #  Grafana
+  # ─────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.3.3
+    container_name: smartshop_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/smartshop360.json
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────────────────────
+  #  PostgreSQL Exporter
+  # ─────────────────────────────────────────────────────────────
+  postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: smartshop_pg_exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://admin:password@host.docker.internal:5432/smartshop_db?sslmode=disable"
+    ports:
+      - "9187:9187"
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:

@@ -1,0 +1,35 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: smartshop360
+
+# ─────────────────────────────────────────────────────────────
+#  Règles d'alertes
+# ─────────────────────────────────────────────────────────────
+rule_files:
+  - "alert_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []   # Remplir si Alertmanager est déployé
+
+# ─────────────────────────────────────────────────────────────
+#  Cibles de scraping
+# ─────────────────────────────────────────────────────────────
+scrape_configs:
+  - job_name: smartshop360
+    static_configs:
+      - targets: ["host.docker.internal:8000"]  # métriques Python
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  - job_name: postgres
+    static_configs:
+      - targets: ["postgres_exporter:9187"]
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
