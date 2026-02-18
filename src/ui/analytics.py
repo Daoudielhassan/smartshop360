@@ -466,27 +466,126 @@ def render_forecast(query_db):
         _export_widget(prev_df, "prevision_ventes")
 
     except ImportError:
-        # Fallback : régression linéaire simple
-        st.info("Prophet non installé — utilisation d'une régression linéaire de fallback. `pip install prophet` pour de meilleures prévisions.")
-        from sklearn.linear_model import LinearRegression
+        # Fallback 1 : Holt-Winters (Exponential Smoothing) via statsmodels
+        # Gère tendance + saisonnalité mensuelle — bien supérieur à la régression linéaire
+        try:
+            from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
-        ts_data["t"] = np.arange(len(ts_data))
-        model = LinearRegression()
-        model.fit(ts_data[["t"]], ts_data["y"])
+            st.info(
+                "Prophet non installé — utilisation de **Holt-Winters (statsmodels)** "
+                "pour la prévision. `pip install prophet` pour de meilleures prévisions."
+            )
 
-        last_ds   = ts_data["ds"].max()
-        future_ts = pd.date_range(last_ds + pd.DateOffset(months=1), periods=horizon, freq="MS")
-        # Utiliser un DataFrame avec le même nom de colonne pour éviter le warning sklearn
-        future_t  = pd.DataFrame({"t": np.arange(len(ts_data), len(ts_data) + horizon)})
-        y_pred    = model.predict(future_t)
+            n = len(ts_data)
+            # Saisonnalité annuelle (12 mois) seulement si on a au moins 2 cycles complets
+            use_seasonal = n >= 24
+            trend_type   = "add"
+            seasonal_type = "add" if use_seasonal else None
+            seasonal_periods = 12 if use_seasonal else None
 
-        fig = go.Figure()
-        fig.add_scatter(x=ts_data["ds"], y=ts_data["y"], mode="markers+lines",
-                        name="Données réelles", marker=dict(color="royalblue"))
-        fig.add_scatter(x=future_ts, y=y_pred, mode="lines+markers",
-                        name="Prévision linéaire", line=dict(color="orange", dash="dash"))
-        fig.update_layout(title=f"Prévision CA — {horizon} mois (Régression linéaire)")
-        st.plotly_chart(fig, width="stretch")
+            hw_model = ExponentialSmoothing(
+                ts_data["y"].values,
+                trend          = trend_type,
+                seasonal       = seasonal_type,
+                seasonal_periods = seasonal_periods,
+                initialization_method = "estimated",
+            ).fit(optimized=True)
+
+            y_fit   = hw_model.fittedvalues
+            y_pred  = hw_model.forecast(horizon)
+
+            last_ds   = ts_data["ds"].max()
+            future_ts = pd.date_range(last_ds + pd.DateOffset(months=1), periods=horizon, freq="MS")
+
+            # Intervalle de confiance approximatif : ±1.96 * RMSE sur les résidus in-sample
+            residuals = ts_data["y"].values - y_fit
+            rmse      = float(np.sqrt(np.mean(residuals ** 2)))
+            y_upper   = y_pred + 1.96 * rmse
+            y_lower   = np.maximum(y_pred - 1.96 * rmse, 0)
+
+            model_label = (
+                "Holt-Winters (tendance + saisonnalité)" if use_seasonal
+                else "Holt-Winters (tendance)"
+            )
+
+            fig = go.Figure()
+            fig.add_scatter(
+                x=ts_data["ds"], y=ts_data["y"],
+                mode="markers+lines", name="Données réelles",
+                marker=dict(color="royalblue"),
+            )
+            fig.add_scatter(
+                x=ts_data["ds"], y=y_fit,
+                mode="lines", name="Ajustement HW",
+                line=dict(color="green", dash="dot"),
+            )
+            fig.add_traces([
+                go.Scatter(
+                    x=future_ts, y=y_upper,
+                    fill=None, mode="lines",
+                    line=dict(width=0), showlegend=False,
+                ),
+                go.Scatter(
+                    x=future_ts, y=y_lower,
+                    fill="tonexty", mode="lines",
+                    line=dict(width=0),
+                    name="Intervalle de confiance 95%",
+                    fillcolor="rgba(255,165,0,0.2)",
+                ),
+            ])
+            fig.add_scatter(
+                x=future_ts, y=y_pred,
+                mode="lines+markers", name="Prévision",
+                line=dict(color="orange", dash="dash"),
+            )
+            fig.update_layout(
+                title=f"Prévision CA — {horizon} mois ({model_label})",
+                hovermode="x unified",
+            )
+            st.plotly_chart(fig, width="stretch")
+
+            prev_df = pd.DataFrame({
+                "Mois":       future_ts.strftime("%Y-%m"),
+                "CA Prévu":   y_pred.round(2),
+                "Borne Basse": y_lower.round(2),
+                "Borne Haute": y_upper.round(2),
+            })
+            st.subheader("Prévision détaillée")
+            st.dataframe(prev_df, width="stretch", hide_index=True)
+            _export_widget(prev_df, "prevision_ventes")
+
+        except ImportError:
+            # Fallback 2 : régression linéaire (dernier recours)
+            st.info(
+                "Prophet et statsmodels non installés — "
+                "régression linéaire utilisée en dernier recours.\n\n"
+                "`pip install statsmodels` pour Holt-Winters, "
+                "`pip install prophet` pour Prophet."
+            )
+            from sklearn.linear_model import LinearRegression
+
+            ts_data["t"] = np.arange(len(ts_data))
+            lr = LinearRegression()
+            lr.fit(ts_data[["t"]], ts_data["y"])
+
+            last_ds   = ts_data["ds"].max()
+            future_ts = pd.date_range(last_ds + pd.DateOffset(months=1), periods=horizon, freq="MS")
+            future_t  = pd.DataFrame({"t": np.arange(len(ts_data), len(ts_data) + horizon)})
+            y_pred    = lr.predict(future_t)
+
+            fig = go.Figure()
+            fig.add_scatter(
+                x=ts_data["ds"], y=ts_data["y"],
+                mode="markers+lines", name="Données réelles",
+                marker=dict(color="royalblue"),
+            )
+            fig.add_scatter(
+                x=future_ts, y=y_pred,
+                mode="lines+markers", name="Prévision linéaire",
+                line=dict(color="orange", dash="dash"),
+            )
+            fig.update_layout(title=f"Prévision CA — {horizon} mois (Régression linéaire)")
+            st.plotly_chart(fig, width="stretch")
 
 
 # ─────────────────────────────────────────────────────────────
