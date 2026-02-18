@@ -38,6 +38,7 @@ def sample_df():
 def db_available():
     """Retourne True si la DB est accessible (tests d'intégration)."""
     try:
+        # Import from the src directory which is added to sys.path
         from src.db.connection import get_connection
         conn = get_connection()
         conn.close()

@@ -26,10 +26,19 @@ def _file_sha256(path: str) -> str:
     return h.hexdigest()
 
 
+def compute_file_hash(path: str) -> str | None:
+    """Calcule le SHA-256 d'un fichier. Retourne None si le fichier est introuvable."""
+    try:
+        return _file_sha256(path)
+    except FileNotFoundError:
+        return None
+
+
 def load_hashes() -> dict:
     """Charge les hashes précédemment enregistrés."""
-    if HASH_FILE.exists():
-        with open(HASH_FILE, "r") as f:
+    p = Path(HASH_FILE)
+    if p.exists():
+        with open(p, "r") as f:
             return json.load(f)
     return {}
 
@@ -37,9 +46,10 @@ def load_hashes() -> dict:
 def save_hashes(hashes: dict) -> None:
     """Persiste les hashes dans le fichier JSON."""
     hashes["_last_run"] = datetime.utcnow().isoformat()
-    with open(HASH_FILE, "w") as f:
+    p = Path(HASH_FILE)
+    with open(p, "w") as f:
         json.dump(hashes, f, indent=2)
-    print(f"[incremental] Hashes enregistrés → {HASH_FILE}")
+    print(f"[incremental] Hashes enregistrés → {p}")
 
 
 def compute_current_hashes(file_paths: list[str]) -> dict:

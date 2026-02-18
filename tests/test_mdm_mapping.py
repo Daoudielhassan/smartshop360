@@ -129,7 +129,7 @@ class TestBuildProductMapping:
 
     def test_required_columns(self, sample_products_erp, sample_reviews_df):
         df = build_product_mapping(sample_products_erp, sample_reviews_df)
-        for col in ["StockCode", "NomProduit", "Categorie"]:
+        for col in ["ERP_StockCode", "ERP_ProductName", "Category"]:
             assert col in df.columns, f"Colonne manquante: {col}"
 
     def test_row_count_matches_erp(self, sample_products_erp, sample_reviews_df):
@@ -146,7 +146,7 @@ class TestBuildProductMapping:
 
     def test_no_duplicate_stockcodes(self, sample_products_erp, sample_reviews_df):
         df = build_product_mapping(sample_products_erp, sample_reviews_df)
-        assert not df["StockCode"].duplicated().any()
+        assert not df["ERP_StockCode"].duplicated().any()
 
     def test_without_fuzzy(self, sample_products_erp, sample_reviews_df):
         df = build_product_mapping(

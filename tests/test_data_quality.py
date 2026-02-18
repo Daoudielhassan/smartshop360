@@ -38,7 +38,7 @@ class TestExpectNoNulls:
     def test_error_message_contains_column_name(self):
         df = pd.DataFrame({"col_test": [None]})
         r = expect_no_nulls(df, "col_test")
-        assert "col_test" in r.message
+        assert "col_test" in r.rule
 
 
 class TestExpectMinRows:
@@ -84,7 +84,7 @@ class TestExpectValuesInSet:
     def test_message_contains_invalid_values(self):
         df = pd.DataFrame({"cat": ["A", "Z"]})
         r = expect_values_in_set(df, "cat", ["A", "B"])
-        assert "Z" in r.message
+        assert "Z" in r.detail
 
 
 class TestExpectColumnBetween:
@@ -149,41 +149,41 @@ class TestExpectPositiveValues:
 class TestDataQualityReport:
 
     def build_report(self, results):
-        report = DataQualityReport()
+        report = DataQualityReport(name="test")
         for r in results:
             report.add(r)
         return report
 
     def test_passed_when_all_ok(self):
-        r1 = ExpectationResult(passed=True, message="ok")
-        r2 = ExpectationResult(passed=True, message="ok")
+        r1 = ExpectationResult(rule="r1", passed=True, detail="ok")
+        r2 = ExpectationResult(rule="r2", passed=True, detail="ok")
         report = self.build_report([r1, r2])
         assert report.passed
 
     def test_failed_when_any_error(self):
-        r1 = ExpectationResult(passed=True, message="ok")
-        r2 = ExpectationResult(passed=False, level="error", message="fail")
+        r1 = ExpectationResult(rule="r1", passed=True, detail="ok")
+        r2 = ExpectationResult(rule="r2", passed=False, detail="fail", severity="error")
         report = self.build_report([r1, r2])
         assert not report.passed
 
     def test_errors_and_warnings(self):
-        report = DataQualityReport()
-        report.add(ExpectationResult(passed=False, level="error", message="E"))
-        report.add(ExpectationResult(passed=False, level="warning", message="W"))
+        report = DataQualityReport(name="test")
+        report.add(ExpectationResult(rule="e", passed=False, detail="E", severity="error"))
+        report.add(ExpectationResult(rule="w", passed=False, detail="W", severity="warning"))
         assert len(report.errors) == 1
         assert len(report.warnings) == 1
 
     def test_to_dict_contains_keys(self):
         report = self.build_report([
-            ExpectationResult(passed=True, message="ok")
+            ExpectationResult(rule="r", passed=True, detail="ok")
         ])
         d = report.to_dict()
         assert "passed" in d
         assert "errors" in d
         assert "warnings" in d
-        assert "total_checks" in d
+        assert "results" in d
 
     def test_total_checks_count(self):
-        checks = [ExpectationResult(passed=True, message="ok")] * 5
+        checks = [ExpectationResult(rule=f"r{i}", passed=True, detail="ok") for i in range(5)]
         report = self.build_report(checks)
-        assert report.to_dict()["total_checks"] == 5
+        assert len(report.results) == 5

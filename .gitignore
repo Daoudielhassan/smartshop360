@@ -8,14 +8,26 @@ data/
 
 # Python
 __pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
+*.pyd
 *.pyd
 .Python
 *.egg-info/
 dist/
 build/
 *.egg
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# ETL state
+.etl_hashes.json
 
 # Environnements virtuels
 .venv/
@@ -25,7 +37,9 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # IDE
 .vscode/settings.json
+.vscode/launch.json
 .idea/

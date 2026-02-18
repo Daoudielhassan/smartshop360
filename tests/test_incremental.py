@@ -96,7 +96,9 @@ class TestHashPersistence:
     def test_empty_save(self):
         save_hashes({})
         loaded = load_hashes()
-        assert loaded == {}
+        # save_hashes injecte toujours _last_run
+        assert "_last_run" in loaded
+        assert len(loaded) == 1
 
 
 # ─────────────────────────────────────────────────────────────

@@ -18,6 +18,29 @@ from datetime import datetime, timedelta
 SEED = 42
 random.seed(SEED)
 
+# Mots-clés → catégorie (ordre de priorité)
+_CATEGORY_RULES: list[tuple[list[str], str]] = [
+    (["bag", "tote", "purse", "handbag"],                   "Sacs & Accessoires"),
+    (["lamp", "light", "lantern", "candle", "holder"],       "Luminaires"),
+    (["mug", "cup", "plate", "bowl", "glass", "jar"],        "Art de la Table"),
+    (["frame", "sign", "plaque", "poster", "wall"],          "Decoration Murale"),
+    (["box", "wrap", "ribbon", "gift", "tag", "basket"],     "Emballages & Cadeaux"),
+    (["flower", "heart", "rose", "romantic", "love"],        "Nature & Romantique"),
+]
+
+
+def infer_category(product_name: str) -> str:
+    """
+    Infère la catégorie d'un produit à partir de son nom.
+    Utilise des règles à base de mots-clés (insensible à la casse).
+    Retourne 'Divers' si aucune règle ne correspond.
+    """
+    name_lower = product_name.lower()
+    for keywords, category in _CATEGORY_RULES:
+        if any(kw in name_lower for kw in keywords):
+            return category
+    return "Divers"
+
 
 # ─────────────────────────────────────────────────────────────
 #  FUZZY MATCHING — TF-IDF + Similarité Cosinus
@@ -47,6 +70,9 @@ def fuzzy_match_tfidf(
         from sklearn.metrics.pairwise import cosine_similarity
     except ImportError:
         print("[mdm] scikit-learn non disponible — fuzzy matching ignoré")
+        return {}
+
+    if not erp_names or not review_names:
         return {}
 
     all_names = erp_names + review_names
