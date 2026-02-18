@@ -201,7 +201,7 @@ def _truncate_tables(engine):
 # ────────────────────────────────────────────────────────────
 
 def run_etl(force: bool = False):
-    print("🚀 Démarrage ETL SmartShop 360 → PostgreSQL\n")
+    print(" Démarrage ETL SmartShop 360 → PostgreSQL\n")
 
     # 0. Vérification connexion BDD
     if not test_connection():
@@ -213,7 +213,7 @@ def run_etl(force: bool = False):
     # 0b. Détection incrémentale — skip si rien n'a changé
     needs_run, changed = should_run_etl(ETL_SOURCE_FILES, force=force)
     if not needs_run:
-        print("⏭️  ETL ignoré — données déjà à jour.")
+        print("  ETL ignoré — données déjà à jour.")
         return
 
     engine = get_engine()
@@ -221,25 +221,25 @@ def run_etl(force: bool = False):
     # _truncate_tables non nécessaire : DROP+CREATE dans _create_schema
 
     # 1. Source 1 — transactions CSV
-    print("📦 Source 1 — Lecture & nettoyage CSV Online Retail II ...")
+    print(" Source 1 — Lecture & nettoyage CSV Online Retail II ...")
     raw_tx = load_transactions()
     tx     = clean_transactions(raw_tx)
 
     # 2. Top 50 Golden Records ERP
-    print("🔝 Extraction Top 50 produits (Golden Records) ...")
+    print(" Extraction Top 50 produits (Golden Records) ...")
     products_erp = extract_top50_products(tx)
 
     # 3. Source 2 — avis JSON réels
-    print("📦 Source 2 — Chargement des avis JSON réels ...")
+    print(" Source 2 — Chargement des avis JSON réels ...")
     reviews_df = load_reviews()
 
     # 4. MDM — table de mapping
-    print("🔗 Construction PRODUCT_MAPPING ...")
+    print(" Construction PRODUCT_MAPPING ...")
     mapping_df  = build_product_mapping(products_erp, reviews_df)
     reviews_df  = attach_product_to_reviews(reviews_df, mapping_df)
 
     # 4b. Validation qualité (Great Expectations-style)
-    print("\n🔍 Validation qualité des données ...")
+    print("\n Validation qualité des données ...")
     products_check_df = pd.DataFrame(
         [(sc, name, cat) for sc, name, cat in products_erp],
         columns=["ProductID", "ProductName", "Category"]
@@ -247,9 +247,9 @@ def run_etl(force: bool = False):
     quality_ok = run_all_validations(tx, reviews_df, products_check_df)
     if not quality_ok:
         if force:
-            print("⚠️  Erreurs qualité détectées — force=True, ingestion poursuivie.")
+            print("  Erreurs qualité détectées — force=True, ingestion poursuivie.")
         else:
-            print("⚠️  Des erreurs de qualité ont été détectées — ETL interrompu.")
+            print("  Des erreurs de qualité ont été détectées — ETL interrompu.")
             print("   Utilisez force=True pour forcer l'ingestion malgré les erreurs.")
             raise ValueError("Validation qualité des données échouée.")
 
@@ -257,7 +257,7 @@ def run_etl(force: bool = False):
     customers_df = extract_customers(tx)
 
     # 6. Chargement PostgreSQL ────────────────
-    print("\n💾 Chargement dans PostgreSQL ...")
+    print("\n Chargement dans PostgreSQL ...")
 
     # Products
     products_pg = pd.DataFrame([
@@ -265,15 +265,15 @@ def run_etl(force: bool = False):
         for sc, name, cat in products_erp
     ])
     products_pg.to_sql("products", engine, if_exists="append", index=False)
-    print(f"   ✅ {len(products_pg)} produits")
+    print(f"    {len(products_pg)} produits")
 
     # Customers
     customers_df.to_sql("customers", engine, if_exists="append", index=False)
-    print(f"   ✅ {len(customers_df):,} clients")
+    print(f"    {len(customers_df):,} clients")
 
     # Product mapping
     mapping_df.to_sql("product_mapping", engine, if_exists="append", index=False)
-    print(f"   ✅ {len(mapping_df)} mappings MDM")
+    print(f"    {len(mapping_df)} mappings MDM")
 
     # Sales facts (filtrage Top 50)
     top50_codes = set(mapping_df["ERP_StockCode"])
@@ -281,7 +281,7 @@ def run_etl(force: bool = False):
     sales_pg = tx_top[["InvoiceNo", "StockCode", "Quantity", "Revenue",
                         "Margin", "InvoiceDate", "CustomerID"]].copy()
     sales_pg.to_sql("sales_facts", engine, if_exists="append", index=False)
-    print(f"   ✅ {len(sales_pg):,} lignes de ventes")
+    print(f"    {len(sales_pg):,} lignes de ventes")
 
     # Review facts
     review_pg = reviews_df.rename(columns={
@@ -289,7 +289,7 @@ def run_etl(force: bool = False):
         "Review_ProductCode": "ProductID",
     })[["ProductID", "Rating", "ReviewText", "Sentiment", "ReviewDate"]]
     review_pg.to_sql("review_facts", engine, if_exists="append", index=False)
-    print(f"   ✅ {len(review_pg):,} avis clients")
+    print(f"    {len(review_pg):,} avis clients")
 
     # 7. Vues analytiques
     _create_views(engine)
@@ -297,7 +297,7 @@ def run_etl(force: bool = False):
     # 8. Enregistrement des hashes (marque ce run comme réussi)
     record_hashes(ETL_SOURCE_FILES)
 
-    print("\n✅ ETL PostgreSQL terminé avec succès !")
+    print("\n ETL PostgreSQL terminé avec succès !")
 
 
 if __name__ == "__main__":

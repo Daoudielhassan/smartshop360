@@ -26,7 +26,7 @@ from datetime import date, timedelta
 # ─────────────────────────────────────────────────────────────
 
 def render_temporal_filters(query_db):
-    st.title("📅 Analyse Temporelle")
+    st.title(" Analyse Temporelle")
 
     # Plage de dates
     col1, col2 = st.columns(2)
@@ -76,7 +76,7 @@ def render_temporal_filters(query_db):
     st.plotly_chart(fig, width="stretch")
 
     # Top produits de la période
-    st.subheader("🏆 Top Produits de la Période")
+    st.subheader(" Top Produits de la Période")
     top_products = query_db(f"""
         SELECT pm."GoldenRecordName" AS produit,
                pm."Category"         AS categorie,
@@ -102,7 +102,7 @@ def render_temporal_filters(query_db):
 # ─────────────────────────────────────────────────────────────
 
 def render_geo_map(query_db):
-    st.title("🗺️ Carte des Ventes par Pays")
+    st.title(" Carte des Ventes par Pays")
 
     geo_data = query_db("""
         SELECT c."Pays"         AS pays,
@@ -140,7 +140,7 @@ def render_geo_map(query_db):
     fig.update_layout(geo=dict(showframe=False, showcoastlines=True))
     st.plotly_chart(fig, width="stretch")
 
-    st.subheader("📋 Détail par Pays")
+    st.subheader(" Détail par Pays")
     st.dataframe(
         geo_data.rename(columns={"pays": "Pays", "nb_commandes": "Commandes",
                                   "ca": "CA (EUR)", "nb_clients": "Clients"}),
@@ -154,7 +154,7 @@ def render_geo_map(query_db):
 # ─────────────────────────────────────────────────────────────
 
 def render_product_comparison(query_db):
-    st.title("⚖️ Comparaison Produits")
+    st.title(" Comparaison Produits")
 
     products = query_db('SELECT "ProductID" AS pid, "ProductName" AS pname FROM products ORDER BY "ProductName"')
     if products.empty:
@@ -189,13 +189,13 @@ def render_product_comparison(query_db):
         return
 
     # Tableau de comparaison
-    st.subheader("📋 Tableau de comparaison")
+    st.subheader(" Tableau de comparaison")
     # Forcer tout en str pour éviter les colonnes object à type mixte (float NaN + str)
     comparison_display = kpi_df.set_index("produit").T.astype(str)
     st.dataframe(comparison_display, width="stretch")
 
     # Radar chart
-    st.subheader("🕸️ Radar des métriques normalisées")
+    st.subheader(" Radar des métriques normalisées")
     metrics = ["ca", "marge", "qte", "note", "nb_avis"]
     norm_df = kpi_df.copy()
     for m in metrics:
@@ -236,7 +236,7 @@ def render_product_comparison(query_db):
 # ─────────────────────────────────────────────────────────────
 
 def render_scoring(query_db):
-    st.title("🏅 Scoring Produit Composite")
+    st.title(" Scoring Produit Composite")
 
     st.markdown("""
     **Formule du score :**
@@ -302,7 +302,7 @@ def render_scoring(query_db):
 # ─────────────────────────────────────────────────────────────
 
 def render_churn(query_db):
-    st.title("⚠️ Prédiction Churn Clients")
+    st.title(" Prédiction Churn Clients")
 
     st.info("Modèle RFM (Récence, Fréquence, Montant) + RandomForest sklearn")
 
@@ -396,7 +396,7 @@ def render_churn(query_db):
             st.plotly_chart(fig_hist, width="stretch")
 
             # Top clients à risque
-            st.subheader("🚨 Top 20 Clients à Risque Élevé")
+            st.subheader(" Top 20 Clients à Risque Élevé")
             high_risk = df[df["risque"] == "Élevé"].nlargest(20, "churn_proba")[
                 ["ClientID", "Pays", "frequence", "montant", "recence_jours", "churn_proba"]
             ].rename(columns={
@@ -415,7 +415,7 @@ def render_churn(query_db):
 # ─────────────────────────────────────────────────────────────
 
 def render_forecast(query_db):
-    st.title("📈 Prévision des Ventes")
+    st.title(" Prévision des Ventes")
 
     ts_data = query_db("""
         SELECT DATE_TRUNC('month', "InvoiceDate") AS ds,
@@ -457,7 +457,7 @@ def render_forecast(query_db):
         fig.update_layout(title=f"Prévision CA — {horizon} mois (Prophet)", hovermode="x unified")
         st.plotly_chart(fig, width="stretch")
 
-        st.subheader("📋 Prévision détaillée")
+        st.subheader(" Prévision détaillée")
         prev_df = forecast[future_mask][["ds", "yhat", "yhat_lower", "yhat_upper"]].rename(columns={
             "ds": "Mois", "yhat": "CA Prévu", "yhat_lower": "Borne Basse", "yhat_upper": "Borne Haute"
         })
@@ -505,7 +505,7 @@ def _export_widget(df: pd.DataFrame, filename_prefix: str):
     with c1:
         csv = df.to_csv(index=False).encode("utf-8")
         st.download_button(
-            label    = "⬇️ CSV",
+            label    = " CSV",
             data     = csv,
             file_name = f"{filename_prefix}.csv",
             mime     = "text/csv",
@@ -518,7 +518,7 @@ def _export_widget(df: pd.DataFrame, filename_prefix: str):
             df.to_excel(writer, index=False, sheet_name="Data")
         buf.seek(0)
         st.download_button(
-            label    = "⬇️ Excel",
+            label    = " Excel",
             data     = buf.read(),
             file_name = f"{filename_prefix}.xlsx",
             mime     = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

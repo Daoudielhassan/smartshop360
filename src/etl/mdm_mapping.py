@@ -196,21 +196,21 @@ def mdm_strategy_description() -> dict:
         "poc": {
             "name": "Rank-based Matching (POC)",
             "description": "Le Top-50 ERP est associé rang-par-rang aux 50 avis les plus récents.",
-            "fiabilite": "⚠️ Artificielle — démo uniquement",
+            "fiabilite": " Artificielle — démo uniquement",
         },
         "production_1": {
             "name": "Hard Match — Code EAN/GTIN",
             "description": "Réconciliation déterministe via code-barres universel. Fiabilité 100%.",
-            "fiabilite": "✅ Production — Priorité 1",
+            "fiabilite": " Production — Priorité 1",
         },
         "production_2": {
             "name": "Fuzzy Matching (thefuzz)",
             "description": "Distance de Levenshtein sur noms produits. Seuil > 90% = lien auto.",
-            "fiabilite": "🟡 Production — Priorité 2",
+            "fiabilite": " Production — Priorité 2",
         },
         "production_3": {
             "name": "Semantic Matching (Embeddings)",
             "description": "Sentence-BERT + similarité cosinus pour noms très différents.",
-            "fiabilite": "🔵 Production — Priorité 3",
+            "fiabilite": " Production — Priorité 3",
         },
     }

@@ -28,7 +28,7 @@ def render_chat(api_key: str, run_agent_fn):
     api_key     : clé API LLM (peut être None → mode fallback)
     run_agent_fn: fonction run_agent(question, api_key, history) → dict
     """
-    st.title("🤖 Assistant IA — SmartShop 360")
+    st.title(" Assistant IA — SmartShop 360")
     st.caption("Posez vos questions en langage naturel — l'agent génère et exécute le SQL pour vous.")
 
     # Init historique dans session_state
@@ -38,7 +38,7 @@ def render_chat(api_key: str, run_agent_fn):
         st.session_state.llm_history  = []
 
     # ── Questions exemples ────────────────────────────────────
-    with st.expander("💡 Exemples de questions"):
+    with st.expander(" Exemples de questions"):
         cols = st.columns(2)
         for i, q in enumerate(EXAMPLE_QUESTIONS):
             with cols[i % 2]:
@@ -50,7 +50,7 @@ def render_chat(api_key: str, run_agent_fn):
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
             if msg["role"] == "assistant" and msg.get("sql"):
-                with st.expander("🔍 Voir le SQL généré"):
+                with st.expander(" Voir le SQL généré"):
                     st.code(msg["sql"], language="sql")
                 if msg.get("data"):
                     df = pd.DataFrame(msg["data"])
@@ -79,7 +79,7 @@ def render_chat(api_key: str, run_agent_fn):
             st.markdown(result["answer"])
 
             if result.get("sql"):
-                with st.expander("🔍 Voir le SQL généré"):
+                with st.expander(" Voir le SQL généré"):
                     st.code(result["sql"], language="sql")
 
             if result.get("data"):
@@ -101,7 +101,7 @@ def render_chat(api_key: str, run_agent_fn):
 
     # ── Bouton reset ──────────────────────────────────────────
     if st.session_state.chat_history:
-        if st.button("🗑️ Effacer la conversation"):
+        if st.button(" Effacer la conversation"):
             st.session_state.chat_history = []
             st.session_state.llm_history  = []
             st.rerun()

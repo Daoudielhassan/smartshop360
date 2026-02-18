@@ -141,7 +141,7 @@ class ReviewRAG:
         if not results:
             return "Aucun avis trouvé pour cette recherche sémantique."
 
-        lines = [f"🔍 Résultats RAG pour : '{query}'\n"]
+        lines = [f" Résultats RAG pour : '{query}'\n"]
         for i, r in enumerate(results, 1):
             lines.append(
                 f"{i}. [{r['product_name']}] Note:{r['rating']:.1f} "

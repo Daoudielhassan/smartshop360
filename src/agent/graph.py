@@ -57,14 +57,14 @@ def _detect_provider(api_key: str | None = None) -> tuple:
 def get_active_provider(api_key: str | None = None) -> str:
     """Retourne une chaîne lisible décrivant le provider actif."""
     labels = {
-        "groq":      "🟢 Groq (Llama 3.3-70B)",
-        "mistral":   "🔵 Mistral (Large)",
-        "openai":    "🟠 OpenAI (GPT-4o-mini)",
-        "anthropic": "🟣 Anthropic (Claude 3.5 Haiku)",
-        "fallback":  "⚫ Mode Hors-ligne (règles SQL)",
+        "groq":      " Groq (Llama 3.3-70B)",
+        "mistral":   " Mistral (Large)",
+        "openai":    " OpenAI (GPT-4o-mini)",
+        "anthropic": " Anthropic (Claude 3.5 Haiku)",
+        "fallback":  " Mode Hors-ligne (règles SQL)",
     }
     provider, _ = _detect_provider(api_key)
-    return labels.get(provider, "❓ Inconnu")
+    return labels.get(provider, " Inconnu")
 
 
 # ────────────────────────────────────────────────────────────

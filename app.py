@@ -12,16 +12,16 @@ Architecture suivie : architecture.txt
   - src/ui/analytics.py       : pages analytiques avancées
 
 10 écrans :
-  1.  📊 Dashboard              — KPIs globaux + alertes
-  2.  🔍 Analyse Produit        — Fiche 360° par produit
-  3.  🤖 Assistant IA           — Chatbot Text-to-SQL
-  4.  🏗️  Qualité des Données   — Couverture MDM
-  5.  📅 Analyse Temporelle     — Filtres date + CA par période
-  6.  🗺️  Carte Géographique    — Choropleth par pays
-  7.  ⚖️  Comparaison Produits  — Radar + barres côte à côte
-  8.  🏅 Scoring Produits       — Composite CA/Note/Qté/Avis
-  9.  ⚠️  Churn Clients         — RFM + RandomForest
-  10. 📈 Prévision Ventes       — Prophet / régression linéaire
+  1.   Dashboard              — KPIs globaux + alertes
+  2.   Analyse Produit        — Fiche 360° par produit
+  3.   Assistant IA           — Chatbot Text-to-SQL
+  4.    Qualité des Données   — Couverture MDM
+  5.   Analyse Temporelle     — Filtres date + CA par période
+  6.    Carte Géographique    — Choropleth par pays
+  7.    Comparaison Produits  — Radar + barres côte à côte
+  8.   Scoring Produits       — Composite CA/Note/Qté/Avis
+  9.    Churn Clients         — RFM + RandomForest
+  10.  Prévision Ventes       — Prophet / régression linéaire
 """
 
 import os
@@ -60,7 +60,7 @@ except Exception:
 # ─────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="SmartShop 360",
-    page_icon="🛍️",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -68,7 +68,7 @@ st.set_page_config(
 # ─────────────────────────────────────────────────────────────────────────────
 #  Init BDD (ETL au premier lancement)
 # ─────────────────────────────────────────────────────────────────────────────
-@st.cache_resource(show_spinner="⚙️ Initialisation de la base de données...")
+@st.cache_resource(show_spinner=" Initialisation de la base de données...")
 def init_db():
     """
     Vérifie la connexion PostgreSQL.
@@ -76,7 +76,7 @@ def init_db():
     """
     if not test_connection():
         st.error(
-            "❌ Impossible de se connecter à PostgreSQL.\n\n"
+            " Impossible de se connecter à PostgreSQL.\n\n"
             "Lancez le conteneur Docker : `docker-compose up -d db`\n"
             "puis rechargez cette page."
         )
@@ -128,21 +128,21 @@ def render_sidebar() -> tuple:
         page = st.radio(
             "Navigation",
             [
-                "📊 Dashboard",
-                "🔍 Analyse Produit",
-                "🤖 Assistant IA",
-                "🏗️ Qualité des Données",
-                "📅 Analyse Temporelle",
-                "🗺️ Carte Géographique",
-                "⚖️ Comparaison Produits",
-                "🏅 Scoring Produits",
-                "⚠️ Churn Clients",
-                "📈 Prévision Ventes",
+                " Dashboard",
+                " Analyse Produit",
+                " Assistant IA",
+                " Qualité des Données",
+                " Analyse Temporelle",
+                " Carte Géographique",
+                " Comparaison Produits",
+                " Scoring Produits",
+                " Churn Clients",
+                " Prévision Ventes",
             ],
         )
 
         st.divider()
-        st.subheader("🔑 Clé API LLM")
+        st.subheader(" Clé API LLM")
 
         env_key = (
             os.environ.get("GROQ_API_KEY")
@@ -174,7 +174,7 @@ def render_sidebar() -> tuple:
         st.info(f"**Provider actif** : {provider_label}")
 
         st.divider()
-        if st.button("🔄 Relancer l'ETL"):
+        if st.button(" Relancer l'ETL"):
             st.cache_data.clear()
             st.cache_resource.clear()
             from src.etl.run_etl import run_etl
@@ -195,34 +195,34 @@ def main():
     init_db()
     page, api_key = render_sidebar()
 
-    if page == "📊 Dashboard":
+    if page == " Dashboard":
         render_dashboard(query_db)
 
-    elif page == "🔍 Analyse Produit":
+    elif page == " Analyse Produit":
         render_product_analysis(query_db)
 
-    elif page == "🤖 Assistant IA":
+    elif page == " Assistant IA":
         render_chat(api_key or "", run_agent)
 
-    elif page == "🏗️ Qualité des Données":
+    elif page == " Qualité des Données":
         render_data_quality(query_db)
 
-    elif page == "📅 Analyse Temporelle":
+    elif page == " Analyse Temporelle":
         render_temporal_filters(query_db)
 
-    elif page == "🗺️ Carte Géographique":
+    elif page == " Carte Géographique":
         render_geo_map(query_db)
 
-    elif page == "⚖️ Comparaison Produits":
+    elif page == " Comparaison Produits":
         render_product_comparison(query_db)
 
-    elif page == "🏅 Scoring Produits":
+    elif page == " Scoring Produits":
         render_scoring(query_db)
 
-    elif page == "⚠️ Churn Clients":
+    elif page == " Churn Clients":
         render_churn(query_db)
 
-    elif page == "📈 Prévision Ventes":
+    elif page == " Prévision Ventes":
         render_forecast(query_db)
 
 

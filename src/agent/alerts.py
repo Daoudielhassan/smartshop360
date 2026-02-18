@@ -59,7 +59,7 @@ def get_critical_products() -> list[dict]:
 
 def _format_alert_text(products: list[dict]) -> str:
     lines = [
-        f"🚨 SmartShop 360 — Alerte CRITIQUE ({datetime.now().strftime('%Y-%m-%d %H:%M')})",
+        f" SmartShop 360 — Alerte CRITIQUE ({datetime.now().strftime('%Y-%m-%d %H:%M')})",
         f"{len(products)} produit(s) en statut CRITIQUE :\n",
     ]
     for p in products:
@@ -75,7 +75,7 @@ def _format_alert_text(products: list[dict]) -> str:
 def _format_slack_payload(products: list[dict]) -> dict:
     text_body = _format_alert_text(products)
     return {
-        "text": "🚨 *Alerte SmartShop 360 — Produits CRITIQUES*",
+        "text": " *Alerte SmartShop 360 — Produits CRITIQUES*",
         "blocks": [
             {"type": "section", "text": {"type": "mrkdwn", "text": f"```{text_body}```"}},
         ]
@@ -101,7 +101,7 @@ def send_email_alert(products: list[dict]) -> bool:
 
     body = _format_alert_text(products)
     msg  = MIMEMultipart("alternative")
-    msg["Subject"] = f"🚨 SmartShop 360 — {len(products)} produit(s) CRITIQUE(s)"
+    msg["Subject"] = f" SmartShop 360 — {len(products)} produit(s) CRITIQUE(s)"
     msg["From"]    = from_addr
     msg["To"]      = to_addr
     msg.attach(MIMEText(body, "plain", "utf-8"))
@@ -167,7 +167,7 @@ def check_and_alert(dry_run: bool = False) -> list[dict]:
     products = get_critical_products()
 
     if not products:
-        print("[alerts] Aucun produit CRITIQUE — tout va bien ✅")
+        print("[alerts] Aucun produit CRITIQUE — tout va bien ")
         return []
 
     print(f"[alerts] {len(products)} produit(s) CRITIQUE(s) détecté(s)")

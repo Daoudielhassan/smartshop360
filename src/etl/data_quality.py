@@ -26,7 +26,7 @@ class ExpectationResult:
         self.severity = severity
 
     def __repr__(self):
-        icon = "✅" if self.passed else ("❌" if self.severity == "error" else "⚠️")
+        icon = "" if self.passed else ("" if self.severity == "error" else "")
         return f"{icon} [{self.severity.upper()}] {self.rule} — {self.detail}"
 
 
@@ -52,11 +52,11 @@ class DataQualityReport:
 
     def print_report(self):
         print(f"\n{'='*60}")
-        print(f"📋 Data Quality Report — {self.name}")
+        print(f" Data Quality Report — {self.name}")
         print(f"{'='*60}")
         for r in self.results:
             print(f"  {r}")
-        status = "✅ PASSED" if self.passed else "❌ FAILED"
+        status = " PASSED" if self.passed else " FAILED"
         print(f"\n  Résultat global : {status} ({len(self.errors)} erreur(s), {len(self.warnings)} avertissement(s))")
         print(f"{'='*60}\n")
 
