@@ -102,12 +102,53 @@ def init_db():
 # ─────────────────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=300, show_spinner=False)
 def query_db(sql: str) -> pd.DataFrame:
-    """Exécute une requête SELECT et retourne un DataFrame."""
+    """
+    Exécute une requête SELECT et retourne un DataFrame.
+    Distingue les erreurs DBAPI pour un message clair et une action corrective.
+    """
     try:
         engine = get_engine()
         return pd.read_sql(sql, engine)
-    except Exception as e:
-        st.warning(f"Erreur requête : {e}")
+
+    except Exception as exc:
+        # Importer les types d'erreurs DBAPI via SQLAlchemy
+        try:
+            from sqlalchemy.exc import ProgrammingError, OperationalError, NotSupportedError
+        except ImportError:
+            ProgrammingError = OperationalError = NotSupportedError = Exception
+
+        exc_type = type(exc).__name__
+        orig = getattr(exc, "orig", None)
+        orig_msg = str(orig) if orig else str(exc)
+
+        if isinstance(exc, ProgrammingError):
+            # Table ou vue introuvable → les tables ne sont pas encore créées
+            if any(kw in orig_msg.lower() for kw in ["does not exist", "undefined table", "relation"]):
+                st.error(
+                    "**Table introuvable en base.**  "
+                    "L'ETL n'a pas encore été exécuté ou a échoué.  \n\n"
+                    "Cliquez sur **Relancer l'ETL** dans la barre latérale."
+                )
+            else:
+                st.error(f"**Erreur SQL** ({exc_type}) : `{orig_msg}`")
+
+        elif isinstance(exc, OperationalError):
+            # Connexion coupée ou serveur inaccessible
+            st.error(
+                "**Connexion PostgreSQL perdue.**  \n\n"
+                "Vérifiez que le conteneur est actif : `docker-compose up -d db`  \n"
+                "puis rechargez la page."
+            )
+
+        elif isinstance(exc, NotSupportedError):
+            # Opération non supportée (ex : rollback sur une connexion sans transaction)
+            st.warning(
+                f"**Opération non supportée par le driver** ({exc_type}) : `{orig_msg}`"
+            )
+
+        else:
+            st.warning(f"Erreur inattendue ({exc_type}) : {exc}")
+
         return pd.DataFrame()
 
 

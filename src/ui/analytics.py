@@ -469,7 +469,9 @@ def render_forecast(query_db):
         # Fallback 1 : Holt-Winters (Exponential Smoothing) via statsmodels
         # Gère tendance + saisonnalité mensuelle — bien supérieur à la régression linéaire
         try:
+            import warnings
             from statsmodels.tsa.holtwinters import ExponentialSmoothing
+            from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
             st.info(
                 "Prophet non installé — utilisation de **Holt-Winters (statsmodels)** "
@@ -477,36 +479,61 @@ def render_forecast(query_db):
             )
 
             n = len(ts_data)
-            # Saisonnalité annuelle (12 mois) seulement si on a au moins 2 cycles complets
-            use_seasonal = n >= 24
-            trend_type   = "add"
-            seasonal_type = "add" if use_seasonal else None
-            seasonal_periods = 12 if use_seasonal else None
-
-            hw_model = ExponentialSmoothing(
-                ts_data["y"].values,
-                trend          = trend_type,
-                seasonal       = seasonal_type,
-                seasonal_periods = seasonal_periods,
-                initialization_method = "estimated",
-            ).fit(optimized=True)
-
-            y_fit   = hw_model.fittedvalues
-            y_pred  = hw_model.forecast(horizon)
-
             last_ds   = ts_data["ds"].max()
             future_ts = pd.date_range(last_ds + pd.DateOffset(months=1), periods=horizon, freq="MS")
 
-            # Intervalle de confiance approximatif : ±1.96 * RMSE sur les résidus in-sample
+            # Hiérarchie de configurations : on dégrade si la convergence échoue.
+            # "heuristic" est plus robuste que "estimated" sur petits jeux de données.
+            configs = []
+            if n >= 24:
+                configs.append(dict(trend="add", seasonal="add",   seasonal_periods=12))
+            if n >= 12:
+                configs.append(dict(trend="add", seasonal="mul",   seasonal_periods=12))
+            configs.append(dict(trend="add", seasonal=None))          # tendance seule
+            configs.append(dict(trend=None,  seasonal=None))          # lissage simple
+
+            hw_result = None
+            model_label = "Holt-Winters"
+
+            for cfg in configs:
+                try:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", ConvergenceWarning)
+                        warnings.simplefilter("ignore", UserWarning)
+                        hw_result = ExponentialSmoothing(
+                            ts_data["y"].values,
+                            trend            = cfg["trend"],
+                            seasonal         = cfg["seasonal"],
+                            seasonal_periods = cfg.get("seasonal_periods"),
+                            initialization_method = "heuristic",
+                        ).fit(optimized=True, use_brute=True)
+                    # Vérifier que la convergence a abouti
+                    retvals = getattr(hw_result, "mle_retvals", None)
+                    if retvals is not None and not retvals.get("converged", True):
+                        hw_result = None
+                        continue
+                    # Désignation lisible du modèle retenu
+                    parts = []
+                    if cfg["trend"]:
+                        parts.append("tendance")
+                    if cfg["seasonal"]:
+                        parts.append(f"saisonnalité {cfg['seasonal']}")
+                    model_label = "Holt-Winters" + (f" ({', '.join(parts)})" if parts else " (lissage simple)")
+                    break
+                except Exception:
+                    hw_result = None
+
+            if hw_result is None:
+                raise ValueError("Aucune configuration Holt-Winters n'a convergé.")
+
+            y_fit  = hw_result.fittedvalues
+            y_pred = hw_result.forecast(horizon)
+
+            # Intervalle de confiance approximatif : ±1.96 * RMSE résidus in-sample
             residuals = ts_data["y"].values - y_fit
             rmse      = float(np.sqrt(np.mean(residuals ** 2)))
             y_upper   = y_pred + 1.96 * rmse
             y_lower   = np.maximum(y_pred - 1.96 * rmse, 0)
-
-            model_label = (
-                "Holt-Winters (tendance + saisonnalité)" if use_seasonal
-                else "Holt-Winters (tendance)"
-            )
 
             fig = go.Figure()
             fig.add_scatter(
@@ -516,7 +543,7 @@ def render_forecast(query_db):
             )
             fig.add_scatter(
                 x=ts_data["ds"], y=y_fit,
-                mode="lines", name="Ajustement HW",
+                mode="lines", name=f"Ajustement {model_label}",
                 line=dict(color="green", dash="dot"),
             )
             fig.add_traces([
@@ -545,8 +572,8 @@ def render_forecast(query_db):
             st.plotly_chart(fig, width="stretch")
 
             prev_df = pd.DataFrame({
-                "Mois":       future_ts.strftime("%Y-%m"),
-                "CA Prévu":   y_pred.round(2),
+                "Mois":        future_ts.strftime("%Y-%m"),
+                "CA Prévu":    y_pred.round(2),
                 "Borne Basse": y_lower.round(2),
                 "Borne Haute": y_upper.round(2),
             })
@@ -554,10 +581,10 @@ def render_forecast(query_db):
             st.dataframe(prev_df, width="stretch", hide_index=True)
             _export_widget(prev_df, "prevision_ventes")
 
-        except ImportError:
+        except (ImportError, ValueError):
             # Fallback 2 : régression linéaire (dernier recours)
             st.info(
-                "Prophet et statsmodels non installés — "
+                "Prophet et statsmodels non installés (ou aucun modèle n'a convergé) — "
                 "régression linéaire utilisée en dernier recours.\n\n"
                 "`pip install statsmodels` pour Holt-Winters, "
                 "`pip install prophet` pour Prophet."

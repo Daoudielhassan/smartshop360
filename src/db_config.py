@@ -28,8 +28,18 @@ DATABASE_URL = (
 
 
 def get_engine():
-    """Retourne un moteur SQLAlchemy (connexion poolée)."""
-    return create_engine(DATABASE_URL, pool_pre_ping=True)
+    """Retourne un moteur SQLAlchemy (connexion poolée et robuste)."""
+    return create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,       # teste la connexion avant chaque usage
+        pool_recycle=1800,        # recycle les connexions après 30 min (évite les connexions mortes)
+        pool_size=5,
+        max_overflow=10,
+        connect_args={
+            "connect_timeout": 10,   # abandonne si le serveur ne répond pas en 10 s
+            "options": "-c statement_timeout=30000",  # coupe une requête bloquante après 30 s
+        },
+    )
 
 
 def get_connection():

@@ -81,7 +81,7 @@ def fuzzy_match_tfidf(
         ngram_range = (2, 4),
         lowercase   = True,
     )
-    tfidf_matrix = vectorizer.fit_transform(all_names)
+    tfidf_matrix = vectorizer.fit_transform(all_names).toarray()  # type: ignore
 
     n_erp    = len(erp_names)
     erp_vec  = tfidf_matrix[:n_erp]
