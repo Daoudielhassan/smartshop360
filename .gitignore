@@ -43,3 +43,14 @@ desktop.ini
 .vscode/settings.json
 .vscode/launch.json
 .idea/
+
+# Logs
+logs/
+*.log
+*.aux
+*.minted
+*.tex
+*.tec
+*.out
+*.toc
+*.bbl

@@ -1,5 +1,28 @@
 ﻿# SmartShop 360 - Plateforme Data & Agent IA E-commerce
 
+> **Lancer la demo en 3 etapes**
+>
+> ```bash
+> # Etape 1 — Demarrer PostgreSQL
+> docker-compose up -d db
+>
+> # Etape 2 — Installer les dependances Python
+> pip install -r requirements.txt
+>
+> # Etape 3 — Lancer l'application (ETL automatique au 1er lancement)
+> streamlit run app.py
+> ```
+>
+> L'application est disponible sur **http://localhost:8501**
+> L'ETL s'execute automatiquement si la base est vide (~30-60 s).
+> Aucune cle API requise : l'agent fonctionne en mode fallback SQL hors-ligne.
+>
+> **Lancement tout-en-un (Docker uniquement) :**
+> ```bash
+> cp .env.example .env   # puis editer les cles API si necessaire
+> docker-compose up      # demarre db + app automatiquement
+> ```
+
 ---
 
 ## Table des Matieres
