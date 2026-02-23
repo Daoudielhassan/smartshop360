@@ -54,3 +54,4 @@ logs/
 *.out
 *.toc
 *.bbl
+*.gz

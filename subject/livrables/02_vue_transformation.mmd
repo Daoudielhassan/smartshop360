@@ -1,0 +1,23 @@
+flowchart LR
+    subgraph SIOp[SI Opérationnel]
+      ERP[(ERP)]
+      WEB[(Site Web)]
+      MP[(Marketplace)]
+      REV[(Avis clients)]
+    end
+
+    MDM[Référentiel Produit (MDM)]
+
+    subgraph SIDec[SI Décisionnel]
+      DWH[(Data Warehouse)]
+      KPI[Reporting / KPI]
+      AGENT[Agent IA]
+    end
+
+    ERP --> MDM
+    WEB --> MDM
+    MP --> MDM
+    REV --> MDM
+    MDM --> DWH
+    DWH --> KPI
+    DWH --> AGENT

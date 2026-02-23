@@ -1,0 +1,9 @@
+flowchart LR
+    CWeb[Client Web] --> VS[Vente sur site]
+    CMarket[Client Marketplace] --> VM[Vente Marketplace]
+    VS --> SC[Service Commercial]
+    VM --> SC
+    VS --> AQ[Analyse Qualité]
+    VM --> AQ
+    AQ --> RQ[Responsable Qualité]
+    RQ --> SC

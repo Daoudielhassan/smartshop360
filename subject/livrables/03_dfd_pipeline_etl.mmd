@@ -1,0 +1,7 @@
+flowchart LR
+    S1[(ERP CSV)] --> N[Nettoyage]
+    S2[(Avis JSON)] --> N
+    N --> M[Mapping / Unification MDM]
+    M --> F[(Base Finale / DWH PostgreSQL)]
+    F --> BI[Dashboard & KPI]
+    F --> AI[Agent IA]

@@ -1,0 +1,5 @@
+flowchart LR
+    USER[Utilisateur] --> APP[Conteneur App Python / Streamlit]
+    APP --> DB[(Conteneur PostgreSQL)]
+    APP --> LLM[API LLM Externe]
+    DB --> APP
