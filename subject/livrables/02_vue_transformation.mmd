@@ -1,23 +1,47 @@
 flowchart LR
-    subgraph SIOp[SI Opérationnel]
-      ERP[(ERP)]
-      WEB[(Site Web)]
-      MP[(Marketplace)]
-      REV[(Avis clients)]
+    subgraph SIO[SI Opérationnel / Sources]
+      ERP[online_retail_II.csv\nTransactions ERP]
+      REV[labeledReview.datasetFix.json\nAvis clients]
     end
 
-    MDM[Référentiel Produit (MDM)]
-
-    subgraph SIDec[SI Décisionnel]
-      DWH[(Data Warehouse)]
-      KPI[Reporting / KPI]
-      AGENT[Agent IA]
+    subgraph ETL[Pipeline ETL src/etl]
+      CLN[cleaning.py]
+      DQ[data_quality.py]
+      MDM[mdm_mapping.py\nPivot product_mapping]
+      INC[incremental.py\nSHA-256]
+      RUN[run_etl.py]
+      INC --> CLN --> DQ --> MDM --> RUN
     end
 
-    ERP --> MDM
-    WEB --> MDM
-    MP --> MDM
-    REV --> MDM
-    MDM --> DWH
-    DWH --> KPI
-    DWH --> AGENT
+    subgraph SID[SI Décisionnel PostgreSQL 16]
+      P[(products)]
+      C[(customers)]
+      S[(sales_facts)]
+      R[(review_facts)]
+      PM[(product_mapping)]
+      V[(v_product_kpi\nv_customer_kpi\nv_alerts\nv_data_quality)]
+      PM --- P
+      S --> V
+      R --> V
+      C --> V
+    end
+
+    subgraph USE[Consommation]
+      UI[Streamlit 10 écrans]
+      AG[Agent Text-to-SQL]
+      ML[Analytics/ML]
+      OBS[Prometheus/Grafana]
+    end
+
+    ERP --> INC
+    REV --> INC
+    RUN --> P
+    RUN --> C
+    RUN --> S
+    RUN --> R
+    RUN --> PM
+
+    SID --> UI
+    SID --> AG
+    SID --> ML
+    SID --> OBS

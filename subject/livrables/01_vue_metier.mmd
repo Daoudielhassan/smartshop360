@@ -1,9 +1,43 @@
-flowchart LR
-    CWeb[Client Web] --> VS[Vente sur site]
-    CMarket[Client Marketplace] --> VM[Vente Marketplace]
-    VS --> SC[Service Commercial]
-    VM --> SC
-    VS --> AQ[Analyse Qualité]
-    VM --> AQ
-    AQ --> RQ[Responsable Qualité]
-    RQ --> SC
+flowchart TD
+        subgraph ACT[Acteurs]
+            C1[Client Web]
+            C2[Client Marketplace]
+            A1[Analyste Data]
+            A2[Responsable Qualité/Marketing]
+            A3[Service Commercial]
+            AG[Agent IA]
+        end
+
+        subgraph P1[Processus: Vente sur site]
+            P1a[Parcours catalogue]
+            P1b[Passage commande]
+            P1c[Enregistrement transaction ERP]
+            P1a --> P1b --> P1c
+        end
+
+        subgraph P2[Processus: Vente marketplace]
+            P2a[Consultation produit]
+            P2b[Achat marketplace]
+            P2c[Dépôt avis + note]
+            P2a --> P2b --> P2c
+        end
+
+        subgraph P3[Processus: Analyse qualité]
+            P3a[Unification MDM]
+            P3b[KPI croisés Ventes x Avis]
+            P3c[Alertes CRITIQUE / A_SURVEILLER]
+            P3d[Question en langage naturel]
+            P3a --> P3b --> P3c
+            P3b --> P3d
+        end
+
+        C1 --> P1a
+        C2 --> P2a
+        C2 --> P2c
+        A1 --> P3a
+        A2 --> P3c
+        A3 --> P3b
+        AG --> P3d
+
+        P1c --> P3a
+        P2c --> P3a

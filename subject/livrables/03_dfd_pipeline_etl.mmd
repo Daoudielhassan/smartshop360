@@ -1,7 +1,29 @@
-flowchart LR
-    S1[(ERP CSV)] --> N[Nettoyage]
-    S2[(Avis JSON)] --> N
-    N --> M[Mapping / Unification MDM]
-    M --> F[(Base Finale / DWH PostgreSQL)]
-    F --> BI[Dashboard & KPI]
-    F --> AI[Agent IA]
+flowchart TD
+    S1[(online_retail_II.csv)] --> H{Hash changé ?}
+    S2[(labeledReview.datasetFix.json)] --> H
+    H -->|Non| SKIP[Skip ETL]
+    H -->|Oui| C1[load + clean transactions]
+    H -->|Oui| C2[load + normalize reviews]
+
+    C1 --> P1[extract_top50_products]
+    C1 --> P2[extract_customers]
+    C2 --> DQ[run_all_validations]
+    C1 --> DQ
+
+    DQ --> M1[build_product_mapping\nTF-IDF (char_wb 2-4)]
+    M1 --> M2[attach_product_to_reviews]
+
+    M2 --> L1[(product_mapping)]
+    P1 --> L2[(products)]
+    P2 --> L3[(customers)]
+    C1 --> L4[(sales_facts)]
+    M2 --> L5[(review_facts)]
+
+    L1 --> V[(Vues analytiques)]
+    L2 --> V
+    L3 --> V
+    L4 --> V
+    L5 --> V
+
+    V --> UI[Streamlit]
+    V --> AG[Agent Text-to-SQL]

@@ -1,5 +1,21 @@
 flowchart LR
-    USER[Utilisateur] --> APP[Conteneur App Python / Streamlit]
-    APP --> DB[(Conteneur PostgreSQL)]
-    APP --> LLM[API LLM Externe]
-    DB --> APP
+        U[Utilisateur Navigateur] --> APP[smartshop360_app\nPython/Streamlit :8501]
+
+        subgraph CORE[Docker Compose principal]
+            APP
+            DB[(smartshop360_db\nPostgreSQL 16 :5432)]
+        end
+
+        subgraph MON[Monitoring optionnel]
+            PM[prometheus :9090]
+            GF[grafana :3000]
+            PGE[postgres_exporter :9187]
+        end
+
+        APP --> DB
+        DB --> APP
+        APP --> LLM[API LLM externe\nGroq/Mistral/OpenAI/Anthropic]
+        APP --> MET[Endpoint metrics :8000]
+        PM --> MET
+        PM --> PGE
+        GF --> PM
