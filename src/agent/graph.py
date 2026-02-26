@@ -27,6 +27,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from src.agent.tools import execute_sql, python_analysis, SYSTEM_PROMPT
 
+# Mots-clés déclenchant une analyse Python post-SQL
+_ANALYSIS_KEYWORDS = {
+    "segmentation": ["segment",  "rentable",  "satisfait",  "quadrant",  "cluster"],
+    "correlation":  ["corrélation", "corrélé",   "lien entre",  "impact de"],
+    "trend":        ["tendance",   "evolution",  "évolution",  "mois par mois", "mensuel"],
+    "rfm":          ["rfm",        "récence",    "fréquence",   "monétaire",   "profil client"],
+}
+
 
 # ────────────────────────────────────────────────────────────
 #  Détection du provider
@@ -168,6 +176,20 @@ def _fallback_sql(question: str) -> str:
         sql = 'SELECT "ProductName", "Notemoyenne", "AvisNegatifs", "Statut" FROM v_alerts WHERE "Statut" IN (\'CRITIQUE\', \'A_SURVEILLER\') ORDER BY "Notemoyenne" ASC LIMIT 10'
     elif any(w in q for w in ["produit", "vente", "best", "top", "meilleur"]):
         sql = 'SELECT "ProductName", "Category", "CA", "QuantiteVendue", "Notemoyenne" FROM v_product_kpi ORDER BY "CA" DESC LIMIT 10'
+    elif any(w in q for w in ["segment", "rentable", "satisfait", "quadrant", "cluster"]):
+        sql = (
+            'SELECT c."ClientID", c."Nom", c."Pays", '
+            'ROUND(c."CA_Total"::numeric, 2) AS "CA_Total", '
+            'c."NbCommandes", '
+            'ROUND(c."PanierMoyen"::numeric, 2) AS "PanierMoyen", '
+            'ROUND(COALESCE(AVG(rf."Rating"), 0)::numeric, 2) AS "NoteMoyenne" '
+            'FROM v_customer_kpi c '
+            'JOIN sales_facts sf ON sf."CustomerID" = c."ClientID" '
+            'JOIN product_mapping pm ON pm."ERP_StockCode" = sf."StockCode" '
+            'JOIN review_facts rf ON rf."ProductID" = pm."Review_ProductCode" '
+            'GROUP BY c."ClientID", c."Nom", c."Pays", c."CA_Total", c."NbCommandes", c."PanierMoyen" '
+            'ORDER BY c."CA_Total" DESC LIMIT 200'
+        )
     elif any(w in q for w in ["client", "acheteur", "fidèle"]):
         sql = 'SELECT "Nom", "Pays", "NbCommandes", "CA_Total" FROM v_customer_kpi ORDER BY "CA_Total" DESC LIMIT 10'
     elif any(w in q for w in ["avis", "note", "sentiment", "satisfaction"]):
@@ -246,26 +268,88 @@ def run_agent(question: str, api_key: str | None = None,
                      answer, row_count, success
     """
     history = conversation_history or []
-
     messages = history + [{"role": "user", "content": question}]
+
+    # Pré-détection : certaines questions complexes nécessitent un SQL prédéfini
+    # (jointures multi-tables que le LLM simplifie souvent trop)
+    q_lower = question.lower()
+    _forced_sql: str | None = None
+    for kw_list in [
+        ["segment", "rentable", "satisfait", "quadrant", "cluster"],
+        ["rfm", "récence", "fréquence", "monétaire", "profil client"],
+    ]:
+        if any(kw in q_lower for kw in kw_list):
+            try:
+                _forced_sql = json.loads(_fallback_sql(question)).get("sql", "")
+            except Exception:
+                pass
+            break
 
     # Étape 1 : génération SQL
     llm_raw = call_llm(messages, api_key)
 
-    # Extraction JSON (le LLM peut inclure du texte autour)
+    # Extraction JSON (le LLM peut inclure texto, code fences, etc.)
     sql, reasoning, answer_template = "", "", ""
     try:
-        match = re.search(r"\{.*\}", llm_raw, re.DOTALL)
+        # 1) Enlever les balises de code Markdown (```json, ```sql, ``` etc.)
+        cleaned = re.sub(r"```\w*\s*", "", llm_raw).replace("```", "")
+        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
         if match:
-            parsed       = json.loads(match.group())
-            sql          = parsed.get("sql", "")
-            reasoning    = parsed.get("reasoning", "")
-            answer_template = parsed.get("answer_template", "")
+            # 2) Normaliser les newlines littéraux dans les strings JSON
+            #    (le LLM met souvent un SELECT multiligne non échappé)
+            json_block = match.group()
+            # Extraire "sql": "..." de façon ciblée avant d'essayer json.loads
+            sql_field = re.search(
+                r'"sql"\s*:\s*"(.*?)",\s*"(?:reasoning|answer)',
+                json_block, re.DOTALL
+            )
+            if sql_field:
+                sql = sql_field.group(1).replace('\\"', '"').replace("\\n", "\n").strip()
+            # Tenter quand même le json.loads sur le reste (reasoning, template)
+            try:
+                norm = json_block.replace("\\n", "\n")
+                # Remplacer les guillemets typographiques qui brisent json.loads
+                norm = re.sub(r'"([^"]*?)"(?=\s*:)', r'"\1"', norm)
+                parsed          = json.loads(norm)
+                sql             = sql or parsed.get("sql", "").strip()
+                reasoning       = parsed.get("reasoning", "")
+                answer_template = parsed.get("answer_template", "")
+            except json.JSONDecodeError:
+                pass  # sql already extracted above if sql_field matched
     except (json.JSONDecodeError, AttributeError):
-        sql = llm_raw  # dernier recours : traiter la réponse brute comme SQL
+        pass
+
+    # 3) Ultime recours : extraire un SELECT...LIMIT depuis le texte brut
+    if not sql:
+        raw_match = re.search(
+            r"(SELECT\b.+?(?:LIMIT\s+\d+\s*;?|;\s*$))",
+            llm_raw, re.DOTALL | re.IGNORECASE
+        )
+        if raw_match:
+            sql = raw_match.group(1).replace('\\"', '"').strip()
+
+    # Sécurité : si le SQL est toujours vide ou semble être un template vide,
+    # utiliser le fallback par mots-clés
+    _is_placeholder = (
+        not sql
+        or sql.strip() in ("SELECT ...", "SELECT…", "...", "")
+        or not re.search(r"\bFROM\b", sql, re.IGNORECASE)
+    )
+    if _is_placeholder:
+        try:
+            fallback_parsed = json.loads(_fallback_sql(question))
+            sql             = fallback_parsed.get("sql", "")
+            reasoning       = reasoning or fallback_parsed.get("reasoning", "Règle fallback")
+        except Exception:
+            pass
+
+    # Override pour les requêtes complexes pré-définies (segmentation, RFM…)
+    if _forced_sql:
+        sql      = _forced_sql
+        reasoning = reasoning or "SQL pré-défini (segmentation multi-tables)"
 
     # Étape 2 : exécution SQL
-    sql_result = execute_sql(sql) if sql else {"success": False, "error": "SQL vide", "data": [], "columns": [], "row_count": 0}
+    sql_result = execute_sql(sql) if sql else {"success": False, "error": "SQL vide — aucune règle applicable", "data": [], "columns": [], "row_count": 0}
 
     # Étape 3 : réponse naturelle
     if sql_result["success"] and sql_result["data"]:
@@ -274,6 +358,15 @@ def run_agent(question: str, api_key: str | None = None,
         answer = "La requête n'a retourné aucun résultat."
     else:
         answer = f"Erreur SQL : {sql_result.get('error', 'inconnue')}"
+
+    # Étape 4 : Analyse Python automatique (si la question le justifie)
+    analysis: dict | None = None
+    if sql_result["success"] and sql_result["data"]:
+        q_lower = question.lower()
+        for atype, keywords in _ANALYSIS_KEYWORDS.items():
+            if any(kw in q_lower for kw in keywords):
+                analysis = python_analysis(sql_result["data"], atype)
+                break
 
     return {
         "question":  question,
@@ -284,4 +377,5 @@ def run_agent(question: str, api_key: str | None = None,
         "answer":    answer,
         "row_count": sql_result.get("row_count", 0),
         "success":   sql_result.get("success", False),
+        "analysis":  analysis,
     }

@@ -182,4 +182,108 @@ def python_analysis(data: list, analysis_type: str = "summary") -> dict:
             return {"result": monthly.to_dict()}
         return {"result": "Colonnes Date/Revenue non trouvées pour l'analyse de tendance"}
 
+    if analysis_type == "segmentation":
+        """
+        Segmentation clients rentables × satisfaits.
+        Divise les clients en 4 quadrants selon la médiane de CA_Total et NoteMoyenne :
+          Champions          — CA élevé  + Note élevée
+          Déçus Rentables    — CA élevé  + Note faible
+          Fans Peu Dépensiers— CA faible + Note élevée
+          Inactifs           — CA faible + Note faible
+        """
+        # Détection automatique des colonnes CA et Note
+        ca_col   = next((c for c in df.columns if c.lower() in
+                         ("ca_total", "ca", "revenue", "chiffre_affaires", "montant")), None)
+        note_col = next((c for c in df.columns if c.lower() in
+                         ("notemoyenne", "note_moyenne", "notmoyenne", "rating",
+                          "rating_moyen", "note")), None)
+        # Fallback : première colonne numérique contenant "ca" ou "note"
+        if not ca_col:
+            ca_col = next((c for c in df.columns if "ca" in c.lower() or "revenu" in c.lower()), None)
+        if not note_col:
+            note_col = next((c for c in df.columns if "note" in c.lower() or "rating" in c.lower()), None)
+
+        if not ca_col or not note_col:
+            return {"result": f"Colonnes CA ({ca_col}) et/ou Note ({note_col}) introuvables pour la segmentation. Colonnes disponibles : {list(df.columns)}"}
+
+        df[ca_col]   = pd.to_numeric(df[ca_col],   errors="coerce")
+        df[note_col] = pd.to_numeric(df[note_col], errors="coerce")
+        df = df.dropna(subset=[ca_col, note_col])
+
+        med_ca   = df[ca_col].median()
+        med_note = df[note_col].median()
+
+        _LABELS = {
+            (True,  True):  "Champions",
+            (True,  False): "Déçus Rentables",
+            (False, True):  "Fans Peu Dépensiers",
+            (False, False): "Inactifs",
+        }
+        df["_Segment"] = df.apply(
+            lambda r: _LABELS[(r[ca_col] >= med_ca, r[note_col] >= med_note)], axis=1
+        )
+
+        # Colonne label (Nom client, ou première colonne string)
+        label_col = next((c for c in df.columns if c.lower() in ("nom", "name", "clientid")), None)
+        if not label_col:
+            label_col = next((c for c in df.select_dtypes(include="object").columns
+                              if c not in ("_Segment",)), None)
+
+        segments: dict = {}
+        for seg_name in ["Champions", "Déçus Rentables", "Fans Peu Dépensiers", "Inactifs"]:
+            sub = df[df["_Segment"] == seg_name]
+            top: list = []
+            if label_col and len(sub) > 0:
+                top = (sub.nlargest(3, ca_col)[[label_col, ca_col, note_col]]
+                         .round(2).to_dict("records"))
+            segments[seg_name] = {
+                "count":       int(len(sub)),
+                "CA_moyen":    round(float(sub[ca_col].mean()),   2) if len(sub) else 0.0,
+                "Note_moyenne": round(float(sub[note_col].mean()), 2) if len(sub) else 0.0,
+                "top_clients": top,
+            }
+
+        return {
+            "result": {
+                "type":       "segmentation",
+                "segments":   segments,
+                "seuil_CA":   round(float(med_ca),   2),
+                "seuil_note": round(float(med_note), 2),
+                "total":      int(len(df)),
+            }
+        }
+
+    if analysis_type == "rfm":
+        """
+        Scoring RFM simplifié (Récence / Fréquence / Montant).
+        Attend des colonnes proches de : NbCommandes, CA_Total, (date optionnelle).
+        """
+        freq_col  = next((c for c in df.columns if "commande" in c.lower() or "orders" in c.lower()), None)
+        mon_col   = next((c for c in df.columns if c.lower() in ("ca_total", "ca", "revenue")), None)
+        if not freq_col or not mon_col:
+            return {"result": "Colonnes NbCommandes et CA_Total requises pour RFM"}
+
+        df[freq_col] = pd.to_numeric(df[freq_col], errors="coerce")
+        df[mon_col]  = pd.to_numeric(df[mon_col],  errors="coerce")
+        df = df.dropna(subset=[freq_col, mon_col])
+
+        # Quintiles 1-5
+        df["F_score"] = pd.qcut(df[freq_col], 5, labels=[1,2,3,4,5], duplicates="drop").astype(float)
+        df["M_score"] = pd.qcut(df[mon_col],  5, labels=[1,2,3,4,5], duplicates="drop").astype(float)
+        df["RFM"]     = (df["F_score"] + df["M_score"]) / 2
+
+        def _rfm_label(score):
+            if score >= 4.5: return "VIP"
+            if score >= 3.5: return "Fidèle"
+            if score >= 2.5: return "Actif"
+            return "À risque"
+
+        df["Profil"] = df["RFM"].apply(_rfm_label)
+        rfm_summary = df.groupby("Profil").agg(
+            count=(mon_col, "count"),
+            CA_moyen=(mon_col, "mean"),
+        ).round(2).to_dict("index")
+
+        return {"result": {"type": "rfm", "profils": rfm_summary, "total": int(len(df))}}
+
     return {"result": f"Type d'analyse '{analysis_type}' non reconnu"}

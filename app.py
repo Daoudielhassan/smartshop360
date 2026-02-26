@@ -107,8 +107,10 @@ def query_db(sql: str) -> pd.DataFrame:
     Distingue les erreurs DBAPI pour un message clair et une action corrective.
     """
     try:
+        from sqlalchemy import text as _text
         engine = get_engine()
-        return pd.read_sql(sql, engine)
+        with engine.connect() as conn:
+            return pd.read_sql(_text(sql), conn)
 
     except Exception as exc:
         # Importer les types d'erreurs DBAPI via SQLAlchemy

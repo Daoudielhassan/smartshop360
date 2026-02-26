@@ -16,8 +16,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SEED        = int(os.environ.get("SEED", 42))
-SAMPLE_SIZE = int(os.environ.get("SAMPLE_SIZE", 30000))
+SEED             = int(os.environ.get("SEED", 42))
+SAMPLE_SIZE      = int(os.environ.get("SAMPLE_SIZE", 50000))  # 0 = toutes les lignes
+TOP_N_PRODUCTS   = int(os.environ.get("TOP_N_PRODUCTS", 70))  # 0 = tous les produits
 CSV_PATH    = os.environ.get(
     "CSV_PATH",
     os.path.join(os.path.dirname(__file__), "..", "..", "Data", "online_retail_II.csv"),
@@ -59,6 +60,8 @@ def load_transactions(csv_path: str = CSV_PATH, sample_size: int = SAMPLE_SIZE) 
     if sample_size and len(df) > sample_size:
         df = df.sample(n=sample_size, random_state=SEED).reset_index(drop=True)
         print(f"[cleaning] Échantillon : {sample_size:,} lignes retenues")
+    else:
+        print(f"[cleaning] Toutes les lignes conservées : {len(df):,}")
 
     return df
 
@@ -98,20 +101,26 @@ def clean_transactions(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def extract_top50_products(transactions_clean: pd.DataFrame) -> list:
+def extract_top50_products(transactions_clean: pd.DataFrame, top_n: int = TOP_N_PRODUCTS) -> list:
     """
-    Extrait les 50 produits les plus vendus (Golden Records ERP).
+    Extrait les N produits les plus vendus (Golden Records ERP).
+    top_n=0 ou top_n=None → tous les produits uniques (aucune limite).
     Retourne [(StockCode, Description, Category), ...]
     """
-    top = (
+    grouped = (
         transactions_clean
         .groupby(["StockCode", "Description"])["Quantity"]
         .sum()
-        .nlargest(50)
         .reset_index()
-        .drop_duplicates(subset=["StockCode"])   # garantit l'unicité de la PK
-        .head(50)
+        .drop_duplicates(subset=["StockCode"])  # garantit l'unicité de la PK
+        .sort_values("Quantity", ascending=False)
     )
+    if top_n:
+        top = grouped.head(top_n)
+        print(f"[cleaning] Sélection des {top_n} produits les plus vendus")
+    else:
+        top = grouped
+        print(f"[cleaning] Tous les produits retenus : {len(top):,} produits uniques")
 
     def infer_category(name: str) -> str:
         n = str(name).upper()

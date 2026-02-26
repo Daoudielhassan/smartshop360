@@ -126,25 +126,28 @@ def build_product_mapping(
         MappingID, ERP_StockCode, ERP_ProductName, Review_ProductCode,
         Review_ProductName, Category, GoldenRecordName, MatchScore, MatchStrategy
     """
-    n = min(len(products_erp), 50)
-    erp_names = [desc for _, desc, _ in products_erp[:n]]
-    rev_names = [f"Product {i+1}" for i in range(n)]
+    n_erp = len(products_erp)
+    # Fuzzy matching sur un échantillon représentatif (max 200 pour la perf)
+    sample_n  = min(n_erp, 50)
+    erp_names = [desc for _, desc, _ in products_erp[:sample_n]]
+    rev_names = [f"Product {i+1}" for i in range(sample_n)]
 
     fuzzy_results: dict = {}
-    if use_fuzzy and n > 1:
+    if use_fuzzy and sample_n > 1:
         fuzzy_results = fuzzy_match_tfidf(erp_names, rev_names, threshold=fuzzy_threshold)
 
     rows = []
-    for i, (stock_code, description, category) in enumerate(products_erp[:n]):
+    for i, (stock_code, description, category) in enumerate(products_erp):
         if i in fuzzy_results:
             rev_idx, score = fuzzy_results[i]
             match_strategy = "tfidf"
         else:
-            rev_idx = i
-            score   = 0.0
+            # Répartition cyclique : chaque produit pointe vers un avis réel
+            rev_idx        = i  # sera réduit modulo n_reviews dans attach_product_to_reviews
+            score          = 0.0
             match_strategy = "rank"
 
-        review_pid = f"REV_{rev_idx + 1:03d}"
+        review_pid = f"REV_{(rev_idx % 1000) + 1:04d}"
         rows.append({
             "MappingID":            i + 1,
             "ERP_StockCode":        stock_code,
@@ -166,14 +169,13 @@ def build_product_mapping(
 
 def attach_product_to_reviews(reviews_df: pd.DataFrame, mapping_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Associe chaque avis à un produit via le Review_ProductCode.
-    Distribue les avis uniformément sur les 50 produits mappés.
+    Associe chaque avis à un ProductCode unique (REV_0001 … REV_N).
+    Chaque avis reçoit son propre code, permettant aux produits mappés
+    de pointer vers des avis distincts via product_mapping.
     """
-    review_codes = mapping_df["Review_ProductCode"].tolist()
     reviews_df = reviews_df.copy()
-    reviews_df["Review_ProductCode"] = [
-        review_codes[i % len(review_codes)] for i in range(len(reviews_df))
-    ]
+    n = len(reviews_df)
+    reviews_df["Review_ProductCode"] = [f"REV_{i+1:04d}" for i in range(n)]
 
     # Date d'avis simulée sur les 18 derniers mois
     base_date = datetime(2024, 1, 1)

@@ -16,7 +16,83 @@ EXAMPLE_QUESTIONS = [
     "Quel est le CA total par catégorie ?",
     "Quels clients ont le plus de commandes ?",
     "Quels produits sont vendus à plus de 100 unités avec une mauvaise note ?",
+    "Quels segments de clients sont rentables ET satisfaits ?",
+    "Analyse les profils RFM de nos clients.",
 ]
+
+# ── Couleurs par segment ──────────────────────────────────
+_SEGMENT_COLORS = {
+    "Champions":           "#2ecc71",
+    "Déçus Rentables":     "#e67e22",
+    "Fans Peu Dépensiers": "#3498db",
+    "Inactifs":            "#95a5a6",
+}
+_SEGMENT_ICONS = {
+    "Champions":           "🏆",
+    "Déçus Rentables":     "⚠️",
+    "Fans Peu Dépensiers": "💙",
+    "Inactifs":            "💤",
+}
+
+
+def _render_analysis(analysis: dict) -> None:
+    """Affiche les résultats d'analyse Python (segmentation, RFM, etc.)."""
+    if not analysis:
+        return
+    result = analysis.get("result", {})
+    if not isinstance(result, dict):
+        return
+
+    atype = result.get("type")
+
+    # ── Segmentation quadrants ────────────────────────────
+    if atype == "segmentation":
+        segments    = result.get("segments", {})
+        seuil_ca    = result.get("seuil_CA", 0)
+        seuil_note  = result.get("seuil_note", 0)
+        total       = result.get("total", 0)
+
+        st.markdown("#### 📊 Segmentation Clients — Rentabilité × Satisfaction")
+        st.caption(
+            f"Seuil CA médian : **{seuil_ca:,.0f} €** | "
+            f"Seuil Note médian : **{seuil_note:.2f} / 5** | "
+            f"**{total}** clients analysés"
+        )
+
+        cols = st.columns(4)
+        for i, (seg_name, seg_data) in enumerate(segments.items()):
+            icon  = _SEGMENT_ICONS.get(seg_name, "")
+            color = _SEGMENT_COLORS.get(seg_name, "#ccc")
+            with cols[i % 4]:
+                st.markdown(
+                    f"""<div style="border-left:4px solid {color};padding:8px 12px;
+                    border-radius:4px;background:#f8f9fa;margin-bottom:8px">
+                    <strong>{icon} {seg_name}</strong><br/>
+                    <span style="font-size:1.4em;font-weight:700">{seg_data['count']}</span>
+                    <span style="color:#666"> clients</span><br/>
+                    CA moy : <strong>{seg_data['CA_moyen']:,.0f} €</strong><br/>
+                    Note moy : <strong>{seg_data['Note_moyenne']:.2f} ★</strong>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+                if seg_data.get("top_clients"):
+                    top_df = pd.DataFrame(seg_data["top_clients"])
+                    st.dataframe(top_df, hide_index=True, use_container_width=True)
+
+    # ── RFM ──────────────────────────────────────────────
+    elif atype == "rfm":
+        profils = result.get("profils", {})
+        total   = result.get("total", 0)
+        st.markdown("#### 🎯 Scoring RFM — Profils Clients")
+        st.caption(f"**{total}** clients scorés (Fréquence × Montant)")
+        rfm_df = pd.DataFrame.from_dict(profils, orient="index").reset_index()
+        rfm_df.columns = ["Profil", "Effectif", "CA moyen (€)"]
+        st.dataframe(rfm_df, hide_index=True, use_container_width=True)
+
+    # ── Summary / Correlation (texte générique) ───────────
+    elif isinstance(result, dict) and result:
+        with st.expander("🔢 Analyse statistique complémentaire"):
+            st.json(result)
 
 
 def render_chat(api_key: str, run_agent_fn):
@@ -55,6 +131,7 @@ def render_chat(api_key: str, run_agent_fn):
                 if msg.get("data"):
                     df = pd.DataFrame(msg["data"])
                     st.dataframe(df, width='stretch', hide_index=True)
+                _render_analysis(msg.get("analysis"))
 
     # ── Zone de saisie ────────────────────────────────────────
     pending  = st.session_state.pop("pending_question", None)
@@ -87,16 +164,19 @@ def render_chat(api_key: str, run_agent_fn):
                 st.dataframe(df, width='stretch', hide_index=True)
                 st.caption(f"↳ {result['row_count']} ligne(s) retournée(s)")
 
+            _render_analysis(result.get("analysis"))
+
         # Mise à jour de l'historique LLM (contexte pour le prochain tour)
         st.session_state.llm_history.append({"role": "user",      "content": question})
         st.session_state.llm_history.append({"role": "assistant", "content": result["answer"]})
 
         # Sauvegarde dans l'historique affiché
         st.session_state.chat_history.append({
-            "role":    "assistant",
-            "content": result["answer"],
-            "sql":     result.get("sql"),
-            "data":    result.get("data", []),
+            "role":     "assistant",
+            "content":  result["answer"],
+            "sql":      result.get("sql"),
+            "data":     result.get("data", []),
+            "analysis": result.get("analysis"),
         })
 
     # ── Bouton reset ──────────────────────────────────────────
