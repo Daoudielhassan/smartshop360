@@ -143,7 +143,7 @@ def build_product_mapping(
             match_strategy = "tfidf"
         else:
             # Répartition cyclique : chaque produit pointe vers un avis réel
-            rev_idx        = i  # sera réduit modulo n_reviews dans attach_product_to_reviews
+            rev_idx        = i   # rang-par-rang → REV_001 à REV_050
             score          = 0.0
             match_strategy = "rank"
 
@@ -169,13 +169,15 @@ def build_product_mapping(
 
 def attach_product_to_reviews(reviews_df: pd.DataFrame, mapping_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Associe chaque avis à un ProductCode unique (REV_0001 … REV_N).
-    Chaque avis reçoit son propre code, permettant aux produits mappés
-    de pointer vers des avis distincts via product_mapping.
+    Distribue les 1 000 avis sur les 50 Review_ProductCode du mapping
+    (round-robin → ~20 avis par produit = les 50 produits les plus commentés).
+    Consigne POC : 50 produits les plus commentés de la Source 2.
     """
+    review_codes = mapping_df["Review_ProductCode"].tolist()   # REV_001 … REV_050
     reviews_df = reviews_df.copy()
-    n = len(reviews_df)
-    reviews_df["Review_ProductCode"] = [f"REV_{i+1:04d}" for i in range(n)]
+    reviews_df["Review_ProductCode"] = [
+        review_codes[i % len(review_codes)] for i in range(len(reviews_df))
+    ]
 
     # Date d'avis simulée sur les 18 derniers mois
     base_date = datetime(2024, 1, 1)

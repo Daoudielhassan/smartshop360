@@ -144,7 +144,8 @@ VIEWS_SQL = [
     """
     CREATE OR REPLACE VIEW v_data_quality AS
     SELECT
-        (SELECT COUNT(*)                          FROM products)                           AS "Nb_Produits_ERP",
+        (SELECT COUNT(*) FROM products)                                                    AS "Nb_Produits_ERP",
+        (SELECT COUNT(*) FROM product_mapping)                                             AS "Nb_Golden_Records",
         (SELECT COUNT(DISTINCT "ProductID")       FROM review_facts)                       AS "Nb_Produits_Avis",
         (SELECT COUNT(*)                          FROM product_mapping)                    AS "Nb_Mappings",
         (SELECT COUNT(*)                          FROM review_facts)                       AS "Nb_Avis_Total",
@@ -152,8 +153,11 @@ VIEWS_SQL = [
         (SELECT COUNT(DISTINCT "InvoiceNo")       FROM sales_facts)                        AS "Nb_Factures",
         (SELECT COUNT(*)                          FROM customers)                           AS "Nb_Clients",
         ROUND(
-            100.0 * (SELECT COUNT(DISTINCT "ProductID") FROM review_facts)
-            / GREATEST((SELECT COUNT(*) FROM products), 1), 1
+            100.0
+            * (SELECT COUNT(DISTINCT rf."ProductID")
+               FROM review_facts rf
+               WHERE rf."ProductID" IN (SELECT "Review_ProductCode" FROM product_mapping))
+            / GREATEST((SELECT COUNT(*) FROM product_mapping), 1), 1
         )                                                                                  AS "Taux_Couverture_MDM"
     """,
 ]
@@ -225,23 +229,24 @@ def run_etl(force: bool = False):
     raw_tx = load_transactions()
     tx     = clean_transactions(raw_tx)
 
-    # 2. Top 50 Golden Records ERP
+    # 2. Top 50 Golden Records ERP (consigne POC : exactement 50)
     print(" Extraction Top 50 produits (Golden Records) ...")
-    products_erp = extract_top50_products(tx)
+    products_erp_top50 = extract_top50_products(tx, top_n=50)   # MDM : consigne stricte
+    products_erp_all   = extract_top50_products(tx, top_n=0)    # Catalogue complet
 
     # 3. Source 2 — avis JSON réels
     print(" Source 2 — Chargement des avis JSON réels ...")
     reviews_df = load_reviews()
 
-    # 4. MDM — table de mapping
+    # 4. MDM — table de mapping (Top 50 ERP × 50 avis les plus commentés)
     print(" Construction PRODUCT_MAPPING ...")
-    mapping_df  = build_product_mapping(products_erp, reviews_df)
+    mapping_df  = build_product_mapping(products_erp_top50, reviews_df)
     reviews_df  = attach_product_to_reviews(reviews_df, mapping_df)
 
     # 4b. Validation qualité (Great Expectations-style)
     print("\n Validation qualité des données ...")
     products_check_df = pd.DataFrame(
-        [(sc, name, cat) for sc, name, cat in products_erp],
+        [(sc, name, cat) for sc, name, cat in products_erp_top50],
         columns=["ProductID", "ProductName", "Category"]
     )
     quality_ok = run_all_validations(tx, reviews_df, products_check_df)
@@ -259,10 +264,10 @@ def run_etl(force: bool = False):
     # 6. Chargement PostgreSQL ────────────────
     print("\n Chargement dans PostgreSQL ...")
 
-    # Products
+    # Products — catalogue complet (4 630 produits)
     products_pg = pd.DataFrame([
         {"ProductID": sc, "ProductName": name, "Category": cat}
-        for sc, name, cat in products_erp
+        for sc, name, cat in products_erp_all
     ])
     products_pg.to_sql("products", engine, if_exists="append", index=False)
     print(f"    {len(products_pg)} produits")
@@ -275,11 +280,9 @@ def run_etl(force: bool = False):
     mapping_df.to_sql("product_mapping", engine, if_exists="append", index=False)
     print(f"    {len(mapping_df)} mappings MDM")
 
-    # Sales facts (filtrage Top 50)
-    top50_codes = set(mapping_df["ERP_StockCode"])
-    tx_top = tx[tx["StockCode"].isin(top50_codes)].copy()
-    sales_pg = tx_top[["InvoiceNo", "StockCode", "Quantity", "Revenue",
-                        "Margin", "InvoiceDate", "CustomerID"]].copy()
+    # Sales facts — toutes les transactions nettoyées (aucun filtre)
+    sales_pg = tx[["InvoiceNo", "StockCode", "Quantity", "Revenue",
+                   "Margin", "InvoiceDate", "CustomerID"]].copy()
     sales_pg.to_sql("sales_facts", engine, if_exists="append", index=False)
     print(f"    {len(sales_pg):,} lignes de ventes")
 

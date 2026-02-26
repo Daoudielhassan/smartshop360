@@ -286,4 +286,63 @@ def python_analysis(data: list, analysis_type: str = "summary") -> dict:
 
         return {"result": {"type": "rfm", "profils": rfm_summary, "total": int(len(df))}}
 
+    if analysis_type == "clustering":
+        """
+        Segmentation automatique par K-Means (clustering non supervisé).
+        Détecte des groupes naturels de clients selon variables numériques.
+        """
+        try:
+            from sklearn.preprocessing import StandardScaler
+            from sklearn.cluster import KMeans
+        except ImportError:
+            return {"result": "scikit-learn requis pour le clustering (pip install scikit-learn)"}
+
+        numeric_df = df.select_dtypes(include="number").dropna()
+
+        if len(numeric_df) < 5:
+            return {"result": "Dataset insuffisant pour clustering fiable"}
+
+        features = numeric_df.copy()
+
+        scaler   = StandardScaler()
+        X_scaled = scaler.fit_transform(features)
+
+        # Nombre de clusters adaptatif (2 à 4)
+        k     = min(4, max(2, len(features) // 20))
+        model = KMeans(n_clusters=k, random_state=42, n_init="auto")
+        labels = model.fit_predict(X_scaled)
+
+        features["_Cluster"] = labels
+        df = df.loc[features.index].copy()
+        df["_Cluster"] = labels
+
+        # Profilage des clusters
+        clusters: dict = {}
+        for c in sorted(df["_Cluster"].unique()):
+            sub = df[df["_Cluster"] == c]
+            clusters[f"Cluster {c}"] = {
+                "count":    int(len(sub)),
+                "moyennes": (
+                    sub.select_dtypes(include="number")
+                    .drop(columns=["_Cluster"], errors="ignore")
+                    .mean().round(2).to_dict()
+                ),
+            }
+
+        # Importance des variables (dispersion inter-cluster)
+        centers    = scaler.inverse_transform(model.cluster_centers_)
+        feat_cols  = [c for c in features.columns if c != "_Cluster"]
+        centers_df = pd.DataFrame(centers, columns=feat_cols)
+        dispersion = centers_df.std().sort_values(ascending=False).round(2).to_dict()
+
+        return {
+            "result": {
+                "type":               "clustering",
+                "k":                  k,
+                "clusters":           clusters,
+                "variable_importance": dispersion,
+                "total":              int(len(df)),
+            }
+        }
+
     return {"result": f"Type d'analyse '{analysis_type}' non reconnu"}

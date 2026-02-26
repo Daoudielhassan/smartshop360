@@ -18,6 +18,7 @@ EXAMPLE_QUESTIONS = [
     "Quels produits sont vendus à plus de 100 unités avec une mauvaise note ?",
     "Quels segments de clients sont rentables ET satisfaits ?",
     "Analyse les profils RFM de nos clients.",
+    "Fais un clustering automatique de nos clients.",
 ]
 
 # ── Couleurs par segment ──────────────────────────────────
@@ -27,12 +28,7 @@ _SEGMENT_COLORS = {
     "Fans Peu Dépensiers": "#3498db",
     "Inactifs":            "#95a5a6",
 }
-_SEGMENT_ICONS = {
-    "Champions":           "🏆",
-    "Déçus Rentables":     "⚠️",
-    "Fans Peu Dépensiers": "💙",
-    "Inactifs":            "💤",
-}
+
 
 
 def _render_analysis(analysis: dict) -> None:
@@ -52,7 +48,7 @@ def _render_analysis(analysis: dict) -> None:
         seuil_note  = result.get("seuil_note", 0)
         total       = result.get("total", 0)
 
-        st.markdown("#### 📊 Segmentation Clients — Rentabilité × Satisfaction")
+        st.markdown("#### Segmentation Clients — Rentabilité × Satisfaction")
         st.caption(
             f"Seuil CA médian : **{seuil_ca:,.0f} €** | "
             f"Seuil Note médian : **{seuil_note:.2f} / 5** | "
@@ -61,13 +57,12 @@ def _render_analysis(analysis: dict) -> None:
 
         cols = st.columns(4)
         for i, (seg_name, seg_data) in enumerate(segments.items()):
-            icon  = _SEGMENT_ICONS.get(seg_name, "")
             color = _SEGMENT_COLORS.get(seg_name, "#ccc")
             with cols[i % 4]:
                 st.markdown(
                     f"""<div style="border-left:4px solid {color};padding:8px 12px;
                     border-radius:4px;background:#f8f9fa;margin-bottom:8px">
-                    <strong>{icon} {seg_name}</strong><br/>
+                    <strong>{seg_name}</strong><br/>
                     <span style="font-size:1.4em;font-weight:700">{seg_data['count']}</span>
                     <span style="color:#666"> clients</span><br/>
                     CA moy : <strong>{seg_data['CA_moyen']:,.0f} €</strong><br/>
@@ -83,15 +78,53 @@ def _render_analysis(analysis: dict) -> None:
     elif atype == "rfm":
         profils = result.get("profils", {})
         total   = result.get("total", 0)
-        st.markdown("#### 🎯 Scoring RFM — Profils Clients")
+        st.markdown("#### Scoring RFM — Profils Clients")
         st.caption(f"**{total}** clients scorés (Fréquence × Montant)")
         rfm_df = pd.DataFrame.from_dict(profils, orient="index").reset_index()
         rfm_df.columns = ["Profil", "Effectif", "CA moyen (€)"]
         st.dataframe(rfm_df, hide_index=True, use_container_width=True)
+    # ── Clustering K-Means ───────────────────────────
+    elif atype == "clustering":
+        clusters   = result.get("clusters", {})
+        k          = result.get("k", 0)
+        total      = result.get("total", 0)
+        importance = result.get("variable_importance", {})
 
+        st.markdown(f"#### 🧠 Clustering K-Means — {k} groupes détectés")
+        st.caption(f"**{total}** clients analysés — segmentation non supervisée")
+
+        cols = st.columns(k)
+        _CLUSTER_COLORS = ["#3498db", "#2ecc71", "#e67e22", "#9b59b6"]
+        for i, (cluster_name, cdata) in enumerate(clusters.items()):
+            color = _CLUSTER_COLORS[i % len(_CLUSTER_COLORS)]
+            with cols[i % k]:
+                st.markdown(
+                    f"""<div style="border-left:4px solid {color};padding:8px 12px;
+                    border-radius:4px;background:#f8f9fa;margin-bottom:8px">
+                    <strong>{cluster_name}</strong><br/>
+                    <span style="font-size:1.3em;font-weight:700">{cdata['count']}</span>
+                    <span style="color:#666"> clients</span>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+                moyennes = cdata.get("moyennes", {})
+                if moyennes:
+                    moy_df = pd.DataFrame(
+                        [{"Variable": k2, "Moyenne": v} for k2, v in moyennes.items()
+                         if k2 != "_Cluster"]
+                    )
+                    st.dataframe(moy_df, hide_index=True, use_container_width=True)
+
+        if importance:
+            with st.expander("📊 Variables les plus discriminantes"):
+                imp_df = pd.DataFrame(
+                    [{"Variable": k2, "Dispersion inter-cluster": v}
+                     for k2, v in importance.items()]
+                )
+                st.dataframe(imp_df, hide_index=True, use_container_width=True)
     # ── Summary / Correlation (texte générique) ───────────
     elif isinstance(result, dict) and result:
-        with st.expander("🔢 Analyse statistique complémentaire"):
+        with st.expander("Analyse statistique complémentaire"):
             st.json(result)
 
 

@@ -29,10 +29,11 @@ from src.agent.tools import execute_sql, python_analysis, SYSTEM_PROMPT
 
 # Mots-clés déclenchant une analyse Python post-SQL
 _ANALYSIS_KEYWORDS = {
-    "segmentation": ["segment",  "rentable",  "satisfait",  "quadrant",  "cluster"],
-    "correlation":  ["corrélation", "corrélé",   "lien entre",  "impact de"],
-    "trend":        ["tendance",   "evolution",  "évolution",  "mois par mois", "mensuel"],
-    "rfm":          ["rfm",        "récence",    "fréquence",   "monétaire",   "profil client"],
+    "segmentation": ["segment",      "rentable",    "satisfait",    "quadrant"],
+    "clustering":   ["cluster",       "groupe",      "automatique",  "k-means", "natural"],
+    "correlation":  ["corrélation",   "corrélé",     "lien entre",   "impact de"],
+    "trend":        ["tendance",       "evolution",   "évolution",    "mois par mois", "mensuel"],
+    "rfm":          ["rfm",            "récence",     "fréquence",    "monétaire",   "profil client"],
 }
 
 
