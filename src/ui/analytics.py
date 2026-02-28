@@ -433,50 +433,9 @@ def render_forecast(query_db):
 
     # Tentative Prophet, sinon régression linéaire de fallback
     try:
-        from prophet import Prophet  # pip install prophet
-        model = Prophet(yearly_seasonality=True, weekly_seasonality=False, daily_seasonality=False)
-        model.fit(ts_data)
-        future = model.make_future_dataframe(periods=horizon, freq="MS")
-        forecast = model.predict(future)
-
-        fig = go.Figure()
-        fig.add_scatter(x=ts_data["ds"], y=ts_data["y"], mode="markers+lines",
-                        name="Données réelles", marker=dict(color="royalblue"))
-        future_mask = forecast["ds"] > ts_data["ds"].max()
-        fig.add_scatter(x=forecast[~future_mask]["ds"], y=forecast[~future_mask]["yhat"],
-                        mode="lines", name="Ajustement Prophet", line=dict(color="green"))
-        fig.add_scatter(x=forecast[future_mask]["ds"], y=forecast[future_mask]["yhat"],
-                        mode="lines+markers", name="Prévision", line=dict(color="orange", dash="dash"))
-        fig.add_traces([
-            go.Scatter(x=forecast[future_mask]["ds"], y=forecast[future_mask]["yhat_upper"],
-                       fill=None, mode="lines", line=dict(width=0), showlegend=False),
-            go.Scatter(x=forecast[future_mask]["ds"], y=forecast[future_mask]["yhat_lower"],
-                       fill="tonexty", mode="lines", line=dict(width=0),
-                       name="Intervalle de confiance 95%", fillcolor="rgba(255,165,0,0.2)"),
-        ])
-        fig.update_layout(title=f"Prévision CA — {horizon} mois (Prophet)", hovermode="x unified")
-        st.plotly_chart(fig, width="stretch")
-
-        st.subheader(" Prévision détaillée")
-        prev_df = forecast[future_mask][["ds", "yhat", "yhat_lower", "yhat_upper"]].rename(columns={
-            "ds": "Mois", "yhat": "CA Prévu", "yhat_lower": "Borne Basse", "yhat_upper": "Borne Haute"
-        })
-        prev_df["Mois"] = prev_df["Mois"].dt.strftime("%Y-%m")
-        st.dataframe(prev_df, width="stretch", hide_index=True)
-        _export_widget(prev_df, "prevision_ventes")
-
-    except ImportError:
-        # Fallback 1 : Holt-Winters (Exponential Smoothing) via statsmodels
-        # Gère tendance + saisonnalité mensuelle — bien supérieur à la régression linéaire
-        try:
             import warnings
             from statsmodels.tsa.holtwinters import ExponentialSmoothing
             from statsmodels.tools.sm_exceptions import ConvergenceWarning
-
-            st.info(
-                "Prophet non installé — utilisation de **Holt-Winters (statsmodels)** "
-                "pour la prévision. `pip install prophet` pour de meilleures prévisions."
-            )
 
             n = len(ts_data)
             last_ds   = ts_data["ds"].max()
@@ -581,10 +540,9 @@ def render_forecast(query_db):
             st.dataframe(prev_df, width="stretch", hide_index=True)
             _export_widget(prev_df, "prevision_ventes")
 
-        except (ImportError, ValueError):
+    except (ImportError, ValueError):
             # Fallback 2 : régression linéaire (dernier recours)
             st.info(
-                "Prophet et statsmodels non installés (ou aucun modèle n'a convergé) — "
                 "régression linéaire utilisée en dernier recours.\n\n"
                 "`pip install statsmodels` pour Holt-Winters, "
                 "`pip install prophet` pour Prophet."

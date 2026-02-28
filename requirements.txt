@@ -17,6 +17,7 @@ sentence-transformers>=2.2.2  # RAG embeddings (MiniLM)
 
 # ── Machine Learning ─────────────────────────────────────────
 scikit-learn>=1.3.0           # TF-IDF matching, churn, scoring
+rapidfuzz>=3.0.0              # Levenshtein fuzzy matching (MDM P2)
 # prophet>=1.1.5              # Prévisions (optionnel — pip install prophet séparément)
 statsmodels>=0.14.0           # Prévisions via ARIMA si prophet absent
 

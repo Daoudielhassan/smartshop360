@@ -43,7 +43,7 @@ VUES ANALYTIQUES (préférer pour les KPIs) :
 --------------------------------------------
 v_product_kpi(ProductID, ProductName, Category, CA, Marge, QuantiteVendue,
               Notemoyenne, NbAvis, AvisPositifs, AvisNegatifs, AvisNeutres)
-v_customer_kpi(ClientID, Nom, Pays, NbCommandes, CA_Total, PanierMoyen)
+v_customer_kpi(ClientID, Nom, Pays, NbCommandes, NbProduits, CA_Total, PanierMoyen, Notemoyenne, NbAvis)
 v_alerts(ProductID, ProductName, Category, CA, Notemoyenne, NbAvis,
          AvisNegatifs, QuantiteVendue, Statut)
   → Statut : 'CRITIQUE' | 'A_SURVEILLER' | 'OK'
@@ -58,6 +58,11 @@ NOTES :
 - Pour joindre ventes et avis, toujours passer par product_mapping
 - IMPORTANT : les noms de colonnes sont entre guillemets doubles (identifiants PostgreSQL)
   Ex : SELECT "ProductName", "CA" FROM v_product_kpi
+- PAYS : la colonne "Pays" contient des noms de pays EN ANGLAIS (source CSV).
+  Toujours utiliser le nom anglais dans les filtres :
+  France=France, Australie=Australia, Royaume-Uni='United Kingdom',
+  Allemagne=Germany, Espagne=Spain, Italie=Italy, États-Unis=USA,
+  Belgique=Belgium, Pays-Bas=Netherlands, Suède=Sweden, Japon=Japan
 """
 
 SYSTEM_PROMPT = f"""Tu es un Data Analyst expert pour SmartShop 360, un e-commerçant B2C spécialisé en Décoration & Cadeaux.
@@ -83,6 +88,11 @@ Règles SQL :
 - Limiter les résultats à LIMIT 20
 - Arrondir les montants avec ROUND(x, 2)
 - Joindre ventes et avis via product_mapping
+- PAYS : la colonne "Pays" est en ANGLAIS, même si la question est en français.
+  Toujours traduire : Australie→'Australia', Royaume-Uni→'United Kingdom',
+  Allemagne→'Germany', Espagne→'Spain', Italie→'Italy', États-Unis→'USA',
+  Belgique→'Belgium', Pays-Bas→'Netherlands', Suède→'Sweden', Japon→'Japan',
+  Autriche→'Austria', Suisse→'Switzerland', Norvège→'Norway', Danemark→'Denmark'
 - Mettre les noms de colonnes entre guillemets doubles dans les ORDER BY / HAVING
 """
 

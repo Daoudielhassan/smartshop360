@@ -48,12 +48,6 @@ from src.ui.analytics import (
     render_forecast,
 )
 
-# Métriques Prometheus (optionnel)
-try:
-    from monitoring.prometheus_metrics import start_metrics_server
-    start_metrics_server()
-except Exception:
-    pass
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Configuration globale Streamlit
@@ -176,45 +170,16 @@ def render_sidebar() -> tuple:
                 " Assistant IA",
                 " Qualité des Données",
                 " Analyse Temporelle",
-                " Carte Géographique",
-                " Comparaison Produits",
-                " Scoring Produits",
-                " Churn Clients",
+                # " Carte Géographique",
+                # " Comparaison Produits",
+                # " Scoring Produits",
+                # " Churn Clients",
                 " Prévision Ventes",
             ],
         )
 
-        st.divider()
-        st.subheader(" Clé API LLM")
 
-        env_key = (
-            os.environ.get("GROQ_API_KEY")
-            or os.environ.get("MISTRAL_API_KEY")
-            or os.environ.get("OPENAI_API_KEY")
-            or os.environ.get("ANTHROPIC_API_KEY")
-            or ""
-        )
 
-        api_key = st.text_input(
-            "Clé API (Groq / Mistral / OpenAI / Anthropic)",
-            value=env_key,
-            type="password",
-            placeholder="gsk_... / sk-... / sk-ant-...",
-            help="Laissez vide pour utiliser les variables d'environnement du .env",
-        )
-
-        if api_key:
-            if api_key.startswith("gsk_"):
-                os.environ["GROQ_API_KEY"] = api_key
-            elif api_key.startswith("sk-ant-"):
-                os.environ["ANTHROPIC_API_KEY"] = api_key
-            elif api_key.startswith("sk-"):
-                os.environ["OPENAI_API_KEY"] = api_key
-            else:
-                os.environ["MISTRAL_API_KEY"] = api_key
-
-        provider_label = get_active_provider(api_key or None)
-        st.info(f"**Provider actif** : {provider_label}")
 
         st.divider()
         if st.button(" Relancer l'ETL"):
@@ -226,9 +191,8 @@ def render_sidebar() -> tuple:
             st.success("ETL terminé !")
             st.rerun()
 
-        st.caption("SmartShop 360 © 2026")
 
-    return page, api_key
+    return page, os.getenv("OPENAI_API_KEY", "")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -253,17 +217,17 @@ def main():
     elif page == " Analyse Temporelle":
         render_temporal_filters(query_db)
 
-    elif page == " Carte Géographique":
-        render_geo_map(query_db)
+    # elif page == " Carte Géographique":
+    #     render_geo_map(query_db)
 
-    elif page == " Comparaison Produits":
-        render_product_comparison(query_db)
+    # elif page == " Comparaison Produits":
+    #     render_product_comparison(query_db)
 
-    elif page == " Scoring Produits":
-        render_scoring(query_db)
+    # elif page == " Scoring Produits":
+    #     render_scoring(query_db)
 
-    elif page == " Churn Clients":
-        render_churn(query_db)
+    # elif page == " Churn Clients":
+    #     render_churn(query_db)
 
     elif page == " Prévision Ventes":
         render_forecast(query_db)

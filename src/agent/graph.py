@@ -65,6 +65,9 @@ def _detect_provider(api_key: str | None = None) -> tuple:
 
 def get_active_provider(api_key: str | None = None) -> str:
     """Retourne une chaîne lisible décrivant le provider actif."""
+    if _is_ollama_available():
+        model = os.environ.get("OLLAMA_MODEL", "llama3.2")
+        return f" Ollama ({model}) → Groq fallback"
     labels = {
         "groq":      " Groq (Llama 3.3-70B)",
         "mistral":   " Mistral (Large)",
@@ -149,11 +152,60 @@ def _call_anthropic(messages: list, system: str, key: str, max_tokens: int = 102
     raise RuntimeError(f"Anthropic {r.status_code}: {r.text[:200]}")
 
 
+# ────────────────────────────────────────────────────────────
+#  Ollama (local)
+# ────────────────────────────────────────────────────────────
+
+def _ollama_host() -> str:
+    return os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+
+
+def _is_ollama_available() -> bool:
+    """Ping Ollama /api/tags — rapide (timeout 1 s)."""
+    try:
+        r = requests.get(f"{_ollama_host()}/api/tags", timeout=1)
+        return r.status_code == 200
+    except Exception:
+        return False
+
+
+def _call_ollama(messages: list, system: str, max_tokens: int = 1024) -> str:
+    model = os.environ.get("OLLAMA_MODEL", "llama3.2")
+    r = requests.post(
+        f"{_ollama_host()}/v1/chat",
+        headers={"Content-Type": "application/json"},
+        json={
+            "model":      model,
+            "max_tokens": max_tokens,
+            "messages":   [{"role": "system", "content": system}] + messages,
+        },
+        timeout=120,          # les modèles locaux sont plus lents
+    )
+    if r.status_code == 200:
+        return r.json()["choices"][0]["message"]["content"]
+    raise RuntimeError(f"Ollama {r.status_code}: {r.text[:200]}")
+
+
 def call_llm(messages: list, api_key: str | None = None, max_tokens: int = 1024) -> str:
-    """Route vers le bon provider et gère le fallback."""
+    """Route Ollama (priorité 1) → Groq (priorité 2) → autres → fallback."""
+    # 1. Ollama local
+    if _is_ollama_available():
+        try:
+            return _call_ollama(messages, SYSTEM_PROMPT, max_tokens)
+        except Exception as e:
+            print(f"[graph] Ollama échoué : {e} — basculement Groq")
+
+    # 2. Groq (fallback principal)
+    groq_key = os.environ.get("GROQ_API_KEY") or (api_key if api_key and api_key.startswith("gsk_") else None)
+    if groq_key:
+        try:
+            return _call_groq(messages, SYSTEM_PROMPT, groq_key, max_tokens)
+        except Exception as e:
+            print(f"[graph] Groq échoué : {e} — basculement providers secondaires")
+
+    # 3. Providers secondaires (Mistral / OpenAI / Anthropic)
     provider, key = _detect_provider(api_key)
     callers = {
-        "groq":      _call_groq,
         "mistral":   _call_mistral,
         "openai":    _call_openai,
         "anthropic": _call_anthropic,
@@ -230,9 +282,23 @@ def format_natural_response(question: str, sql: str, data: list,
         ),
     }]
 
+    # 1. Ollama local
+    if _is_ollama_available():
+        try:
+            return _call_ollama(messages, "Tu es un assistant data analytique concis.", 512)
+        except Exception:
+            pass
+
+    # 2. Groq fallback
+    groq_key = os.environ.get("GROQ_API_KEY") or (api_key if api_key and api_key.startswith("gsk_") else None)
+    if groq_key:
+        try:
+            return _call_groq(messages, "Tu es un assistant data analytique concis.", groq_key, 512)
+        except Exception:
+            pass
+
     provider, key = _detect_provider(api_key)
     callers = {
-        "groq":      _call_groq,
         "mistral":   _call_mistral,
         "openai":    _call_openai,
         "anthropic": _call_anthropic,

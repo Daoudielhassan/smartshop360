@@ -114,11 +114,16 @@ VIEWS_SQL = [
         c."ClientID",
         c."Nom",
         c."Pays",
-        COUNT(DISTINCT sf."InvoiceNo")                    AS "NbCommandes",
-        ROUND(SUM(sf."Revenue")::NUMERIC, 2)              AS "CA_Total",
-        ROUND(AVG(sf."Revenue")::NUMERIC, 2)              AS "PanierMoyen"
+        COUNT(DISTINCT sf."InvoiceNo")                          AS "NbCommandes",
+        COUNT(DISTINCT sf."StockCode")                          AS "NbProduits",
+        ROUND(SUM(sf."Revenue")::NUMERIC, 2)                    AS "CA_Total",
+        ROUND(AVG(sf."Revenue")::NUMERIC, 2)                    AS "PanierMoyen",
+        ROUND(AVG(rf."Rating")::NUMERIC, 2)                     AS "Notemoyenne",
+        COUNT(rf."ReviewID")                                     AS "NbAvis"
     FROM customers c
-    LEFT JOIN sales_facts sf ON sf."CustomerID" = c."ClientID"
+    LEFT JOIN sales_facts    sf ON sf."CustomerID" = c."ClientID"
+    LEFT JOIN product_mapping pm ON pm."ERP_StockCode" = sf."StockCode"
+    LEFT JOIN review_facts   rf ON rf."ProductID"  = pm."Review_ProductCode"
     GROUP BY c."ClientID", c."Nom", c."Pays"
     """,
     """
@@ -184,7 +189,11 @@ def _create_schema(engine):
 def _create_views(engine):
     """Crée (ou remplace) les vues analytiques PostgreSQL."""
     from sqlalchemy import text
+    # DROP préalable pour éviter l'erreur PostgreSQL sur ajout/réordonnancement de colonnes
+    views_order = ["v_alerts", "v_customer_kpi", "v_product_kpi", "v_data_quality"]
     with engine.begin() as conn:
+        for v in views_order:
+            conn.execute(text(f'DROP VIEW IF EXISTS {v} CASCADE'))
         for view_sql in VIEWS_SQL:
             conn.execute(text(view_sql.strip()))
     print("[run_etl] Vues analytiques créées")

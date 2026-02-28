@@ -90,7 +90,7 @@ def _render_analysis(analysis: dict) -> None:
         total      = result.get("total", 0)
         importance = result.get("variable_importance", {})
 
-        st.markdown(f"#### 🧠 Clustering K-Means — {k} groupes détectés")
+        st.markdown(f"#### Clustering K-Means — {k} groupes détectés")
         st.caption(f"**{total}** clients analysés — segmentation non supervisée")
 
         cols = st.columns(k)
@@ -116,7 +116,7 @@ def _render_analysis(analysis: dict) -> None:
                     st.dataframe(moy_df, hide_index=True, use_container_width=True)
 
         if importance:
-            with st.expander("📊 Variables les plus discriminantes"):
+            with st.expander("Variables les plus discriminantes"):
                 imp_df = pd.DataFrame(
                     [{"Variable": k2, "Dispersion inter-cluster": v}
                      for k2, v in importance.items()]

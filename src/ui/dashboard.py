@@ -62,10 +62,10 @@ def render_dashboard(query_db):
 
     where_parts = []
     if cat_filter != "Toutes":
-        where_parts.append('"Category" = \'{}\''.format(cat_filter.replace("'", "''")))
+        where_parts.append('p."Category" = \'{}\''.format(cat_filter.replace("'", "''")))
     if statut_filter != "Tous" and statut_filter in VALID_STATUTS:
         where_parts.append(
-            '"ProductID" IN (SELECT "ProductID" FROM v_alerts WHERE "Statut" = \'{}\')'.format(statut_filter)
+            'p."ProductID" IN (SELECT "ProductID" FROM v_alerts WHERE "Statut" = \'{}\')'.format(statut_filter)
         )
 
     where = "WHERE " + " AND ".join(where_parts) if where_parts else ""
@@ -349,7 +349,10 @@ def render_data_quality(query_db):
         st.dataframe(cat_cov, width='stretch', hide_index=True)
 
     st.subheader("Strategie MDM")
-    from src.etl.mdm_mapping import mdm_strategy_description
+    from src.etl.mdm_mapping import mdm_strategy_description, MDM_STRATEGY
+    st.info(f"Stratégie active : **{MDM_STRATEGY.upper()}** — "
+            f"configurable via `MDM_STRATEGY` dans `.env`")
     for k, v in mdm_strategy_description().items():
-        with st.expander(f"{v['fiabilite']} - {v['name']}"):
+        label  = ("🟢 " if v.get("active") else "⚪ ") + v['fiabilite'] + " — " + v['name']
+        with st.expander(label, expanded=v.get("active", False)):
             st.write(v["description"])
