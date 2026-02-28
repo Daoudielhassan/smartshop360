@@ -2,9 +2,7 @@
 .env
 
 # Base de données SQLite générée par l'ETL
-data/
-*.db
-*.sqlite
+
 
 # Python
 __pycache__/
