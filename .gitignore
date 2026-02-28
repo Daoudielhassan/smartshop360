@@ -55,3 +55,4 @@ logs/
 *.toc
 *.bbl
 *.gz
+.env.local
